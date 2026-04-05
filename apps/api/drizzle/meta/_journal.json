@@ -8,6 +8,27 @@
       "when": 1775261388663,
       "tag": "0000_early_madame_web",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775299903462,
+      "tag": "0001_far_archangel",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775320865770,
+      "tag": "0002_spicy_yellowjacket",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775380674790,
+      "tag": "0003_shiny_living_tribunal",
+      "breakpoints": true
     }
   ]
 }
