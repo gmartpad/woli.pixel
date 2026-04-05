@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+/* ── M3 Design Tokens (Tailwind v4 @theme) ──── */
+@theme {
+  /* Surface hierarchy */
+  --color-background: #060e20;
+  --color-surface: #060e20;
+  --color-surface-dim: #060e20;
+  --color-surface-container-lowest: #000000;
+  --color-surface-container-low: #091328;
+  --color-surface-container: #0f1930;
+  --color-surface-container-high: #141f38;
+  --color-surface-container-highest: #192540;
+  --color-surface-bright: #1f2b49;
+  --color-surface-variant: #192540;
+
+  /* Primary */
+  --color-primary: #85adff;
+  --color-primary-dim: #699cff;
+  --color-primary-container: #6e9fff;
+  --color-on-primary: #002c66;
+  --color-on-primary-container: #002150;
+
+  /* Secondary */
+  --color-secondary: #8097ff;
+  --color-secondary-dim: #8097ff;
+  --color-secondary-container: #213da1;
+  --color-on-secondary: #00175f;
+  --color-on-secondary-container: #c5ceff;
+
+  /* Tertiary */
+  --color-tertiary: #fbabff;
+  --color-tertiary-container: #f199f7;
+  --color-on-tertiary: #691d74;
+
+  /* Error */
+  --color-error: #ff716c;
+  --color-error-dim: #d7383b;
+  --color-error-container: #9f0519;
+  --color-on-error: #490006;
+  --color-on-error-container: #ffa8a3;
+
+  /* Text / On-surface */
+  --color-on-background: #dee5ff;
+  --color-on-surface: #dee5ff;
+  --color-on-surface-variant: #a3aac4;
+  --color-outline: #6d758c;
+  --color-outline-variant: #40485d;
+
+  /* Fonts */
+  --font-headline: 'Manrope', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-label: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ── Design Tokens (glow + glass + scrollbar vars) ── */
+:root {
+  --glow-primary: 0 0 20px rgba(133, 173, 255, 0.15);
+  --glow-primary-strong: 0 0 30px rgba(133, 173, 255, 0.25);
+  --glow-card: 0 0 15px rgba(133, 173, 255, 0.08);
+  --glass-bg: rgba(20, 31, 56, 0.6);
+  --glass-bg-subtle: rgba(20, 31, 56, 0.4);
+  --glass-border: rgba(64, 72, 93, 0.3);
+  --glass-border-subtle: rgba(64, 72, 93, 0.2);
+  --scrollbar-track: rgba(9, 19, 40, 0.3);
+  --scrollbar-thumb: rgba(64, 72, 93, 0.5);
+  --scrollbar-thumb-hover: rgba(109, 117, 140, 0.7);
+}
+
+/* ── Light Theme Overrides ────────────────────── */
+html.light {
+  --color-background: #f8f9ff;
+  --color-surface: #f8f9ff;
+  --color-surface-dim: #d6d9e6;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f0f1fa;
+  --color-surface-container: #eaecf4;
+  --color-surface-container-high: #e4e6ef;
+  --color-surface-container-highest: #dee0e9;
+  --color-surface-bright: #f8f9ff;
+  --color-surface-variant: #e0e2ec;
+
+  --color-primary: #335ca8;
+  --color-primary-dim: #1a4590;
+  --color-primary-container: #d6e3ff;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #001b3d;
+
+  --color-secondary: #2b4ea4;
+  --color-secondary-dim: #1a3d93;
+  --color-secondary-container: #dbe1ff;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #001849;
+
+  --color-tertiary: #8b3a95;
+  --color-tertiary-container: #ffd6ff;
+  --color-on-tertiary: #ffffff;
+
+  --color-error: #ba1a1a;
+  --color-error-dim: #93000a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #410002;
+
+  --color-on-background: #1a1c24;
+  --color-on-surface: #1a1c24;
+  --color-on-surface-variant: #44474f;
+  --color-outline: #74777f;
+  --color-outline-variant: #c4c6d0;
+
+  --glow-primary: 0 0 20px rgba(51, 92, 168, 0.08);
+  --glow-primary-strong: 0 0 30px rgba(51, 92, 168, 0.12);
+  --glow-card: 0 0 15px rgba(51, 92, 168, 0.04);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-bg-subtle: rgba(255, 255, 255, 0.5);
+  --glass-border: rgba(196, 198, 208, 0.4);
+  --glass-border-subtle: rgba(196, 198, 208, 0.25);
+  --scrollbar-track: rgba(222, 224, 233, 0.5);
+  --scrollbar-thumb: rgba(116, 119, 127, 0.4);
+  --scrollbar-thumb-hover: rgba(68, 71, 79, 0.5);
+}
+
+/* ── Base ─────────────────────────────────────── */
+@layer base {
+  * {
+    @apply transition-colors duration-150;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--color-background);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-headline);
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary/60 ring-offset-2 ring-offset-background;
+  }
+
+  button, a, [role="button"], [role="tab"], label[for], select, summary {
+    cursor: pointer;
+  }
+}
+
+/* ── Glassmorphism Utilities ──────────────────── */
+@layer utilities {
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glow-card);
+  }
+
+  .glass-card-hover {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glow-card);
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+
+  .glass-card-hover:hover {
+    box-shadow: var(--glow-primary);
+    border-color: rgba(133, 173, 255, 0.25);
+  }
+
+  .glass-surface {
+    background: var(--glass-bg-subtle);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--glass-border-subtle);
+  }
+
+  .glow-border {
+    box-shadow: 0 0 15px rgba(133, 173, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .glow-border-active {
+    box-shadow: 0 0 25px rgba(133, 173, 255, 0.2), 0 0 50px rgba(133, 173, 255, 0.1);
+    border-color: rgba(133, 173, 255, 0.4);
+  }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}
+
+/* ── Scrollbar ────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}

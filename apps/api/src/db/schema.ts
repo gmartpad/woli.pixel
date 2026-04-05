@@ -1,0 +1,176 @@
+import { pgTable, uuid, varchar, integer, text, boolean, timestamp, jsonb, index, numeric } from "drizzle-orm/pg-core";
+
+// ── Image Types ──────────────────────────────
+export const imageTypes = pgTable("image_types", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  category: varchar("category", { length: 20 }).notNull(),
+  typeKey: varchar("type_key", { length: 50 }).notNull().unique(),
+  displayName: varchar("display_name", { length: 100 }).notNull(),
+  description: text("description"),
+  width: integer("width"),
+  height: integer("height"),
+  aspectRatio: varchar("aspect_ratio", { length: 20 }),
+  maxFileSizeKb: integer("max_file_size_kb").notNull(),
+  allowedFormats: text("allowed_formats").array().notNull(),
+  recommendedFormat: varchar("recommended_format", { length: 10 }).notNull(),
+  requiresTransparency: boolean("requires_transparency").default(false),
+  minWidth: integer("min_width"),
+  previewContext: varchar("preview_context", { length: 50 }).notNull(),
+  services: text("services").array(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// ── Batch Jobs (Feature 1) ───────────────────
+export const batchJobs = pgTable("batch_jobs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }),
+  totalImages: integer("total_images").default(0).notNull(),
+  completedImages: integer("completed_images").default(0).notNull(),
+  failedImages: integer("failed_images").default(0).notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// ── Brand Profiles (Feature 2) ───────────────
+export const brandProfiles = pgTable("brand_profiles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  primaryColor: varchar("primary_color", { length: 7 }).notNull(),
+  secondaryColor: varchar("secondary_color", { length: 7 }),
+  accentColor: varchar("accent_color", { length: 7 }),
+  neutralColor: varchar("neutral_color", { length: 7 }),
+  forbiddenColors: text("forbidden_colors").array(),
+  logoUploadId: uuid("logo_upload_id"),
+  tolerance: integer("tolerance").default(25).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// ── Image Uploads ────────────────────────────
+export const imageUploads = pgTable("image_uploads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  originalFilename: varchar("original_filename", { length: 255 }).notNull(),
+  originalFormat: varchar("original_format", { length: 10 }).notNull(),
+  originalWidth: integer("original_width").notNull(),
+  originalHeight: integer("original_height").notNull(),
+  originalSizeKb: integer("original_size_kb").notNull(),
+  aiQualityScore: integer("ai_quality_score"),
+  aiContentType: varchar("ai_content_type", { length: 50 }),
+  aiQualityIssues: text("ai_quality_issues").array(),
+  aiSuggestedTypeId: uuid("ai_suggested_type_id").references(() => imageTypes.id),
+  aiSuggestionConfidence: integer("ai_suggestion_confidence"),
+  aiAnalysisJson: jsonb("ai_analysis_json"),
+  targetImageTypeId: uuid("target_image_type_id").references(() => imageTypes.id),
+  processedWidth: integer("processed_width"),
+  processedHeight: integer("processed_height"),
+  processedFormat: varchar("processed_format", { length: 10 }),
+  processedSizeKb: integer("processed_size_kb"),
+  adjustmentsMade: text("adjustments_made").array(),
+  aiExplanation: text("ai_explanation"),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  errorMessage: text("error_message"),
+  originalPath: text("original_path"),
+  processedPath: text("processed_path"),
+  // Feature 1: Batch
+  batchId: uuid("batch_id").references(() => batchJobs.id),
+  batchIndex: integer("batch_index"),
+  // Feature 2: Brand
+  brandProfileId: uuid("brand_profile_id").references(() => brandProfiles.id),
+  brandScore: integer("brand_score"),
+  brandIssues: text("brand_issues").array(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_uploads_status").on(table.status),
+  index("idx_uploads_created").on(table.createdAt),
+  index("idx_uploads_batch").on(table.batchId),
+]);
+
+// ── Audit Jobs (Feature 3) ───────────────────
+export const auditJobs = pgTable("audit_jobs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  sourceType: varchar("source_type", { length: 20 }).default("folder_upload").notNull(),
+  totalImages: integer("total_images").default(0).notNull(),
+  scannedImages: integer("scanned_images").default(0).notNull(),
+  passedImages: integer("passed_images").default(0).notNull(),
+  failedImages: integer("failed_images").default(0).notNull(),
+  errorImages: integer("error_images").default(0).notNull(),
+  avgQualityScore: numeric("avg_quality_score", { precision: 4, scale: 1 }),
+  passThreshold: integer("pass_threshold").default(7).notNull(),
+  status: varchar("status", { length: 20 }).default("created").notNull(),
+  reportJson: jsonb("report_json"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// ── Audit Items (Feature 3) ──────────────────
+export const auditItems = pgTable("audit_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  auditJobId: uuid("audit_job_id").references(() => auditJobs.id).notNull(),
+  sourceUrl: text("source_url"),
+  originalFilename: varchar("original_filename", { length: 255 }).notNull(),
+  originalWidth: integer("original_width"),
+  originalHeight: integer("original_height"),
+  originalSizeKb: integer("original_size_kb"),
+  originalFormat: varchar("original_format", { length: 10 }),
+  filePath: text("file_path"),
+  qualityScore: integer("quality_score"),
+  contentType: varchar("content_type", { length: 50 }),
+  qualityIssues: text("quality_issues").array(),
+  suggestedTypeKey: varchar("suggested_type_key", { length: 50 }),
+  suggestionConfidence: integer("suggestion_confidence"),
+  dominantColors: text("dominant_colors").array(),
+  analysisJson: jsonb("analysis_json"),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_audit_items_job").on(table.auditJobId),
+  index("idx_audit_items_score").on(table.qualityScore),
+]);
+
+// ── Quality Gate Configs (Feature 4) ─────────
+export const qualityGateConfigs = pgTable("quality_gate_configs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  minQualityScore: integer("min_quality_score").default(6).notNull(),
+  maxFileSizeKb: integer("max_file_size_kb"),
+  requireNoBlur: boolean("require_no_blur").default(true).notNull(),
+  requireNoLowResolution: boolean("require_no_low_resolution").default(true).notNull(),
+  requireMinWidth: integer("require_min_width"),
+  requireMinHeight: integer("require_min_height"),
+  allowedContentTypes: text("allowed_content_types").array(),
+  blockedContentTypes: text("blocked_content_types").array(),
+  brandProfileId: uuid("brand_profile_id").references(() => brandProfiles.id),
+  webhookSecret: varchar("webhook_secret", { length: 64 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// ── Gate Results (Feature 4) ─────────────────
+export const gateResults = pgTable("gate_results", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  gateConfigId: uuid("gate_config_id").references(() => qualityGateConfigs.id).notNull(),
+  imageUploadId: uuid("image_upload_id").references(() => imageUploads.id).notNull(),
+  verdict: varchar("verdict", { length: 10 }).notNull(),
+  qualityScore: integer("quality_score").notNull(),
+  failures: text("failures").array(),
+  warnings: text("warnings").array(),
+  metadataJson: jsonb("metadata_json"),
+  source: varchar("source", { length: 50 }).notNull(),
+  sourceReference: varchar("source_reference", { length: 200 }),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_gate_results_verdict").on(table.verdict),
+  index("idx_gate_results_config").on(table.gateConfigId),
+  index("idx_gate_results_source").on(table.source, table.sourceReference),
+]);
