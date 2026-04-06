@@ -90,7 +90,7 @@ profileRouter.post("/avatar", async (c) => {
   }
 
   if (file.size > MAX_AVATAR_SIZE) {
-    return c.json({ error: "O arquivo excede o tamanho maximo de 2MB" }, 400);
+    return c.json({ error: "O arquivo excede o tamanho máximo de 2MB" }, 400);
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -167,7 +167,7 @@ profileRouter.post("/avatar", async (c) => {
 profileRouter.put("/avatar/:id/restore", async (c) => {
   const user = c.get("user" as never) as { id: string } | null;
   if (!user) {
-    return c.json({ error: "Autenticacao necessaria" }, 401);
+    return c.json({ error: "Autenticação necessária" }, 401);
   }
 
   const { id } = c.req.param();
@@ -178,7 +178,7 @@ profileRouter.put("/avatar/:id/restore", async (c) => {
     .where(and(eq(avatarHistory.id, id), eq(avatarHistory.userId, user.id)));
 
   if (rows.length === 0) {
-    return c.json({ error: "Avatar nao encontrado" }, 404);
+    return c.json({ error: "Avatar não encontrado" }, 404);
   }
 
   const proxyUrl = `/api/v1/avatar/${id}`;
@@ -200,7 +200,7 @@ profileRouter.put("/avatar/:id/restore", async (c) => {
 profileRouter.delete("/avatar/:id", async (c) => {
   const user = c.get("user" as never) as { id: string; image?: string | null } | null;
   if (!user) {
-    return c.json({ error: "Autenticacao necessaria" }, 401);
+    return c.json({ error: "Autenticação necessária" }, 401);
   }
 
   const { id } = c.req.param();
@@ -211,7 +211,7 @@ profileRouter.delete("/avatar/:id", async (c) => {
     .where(and(eq(avatarHistory.id, id), eq(avatarHistory.userId, user.id)));
 
   if (rows.length === 0) {
-    return c.json({ error: "Avatar nao encontrado" }, 404);
+    return c.json({ error: "Avatar não encontrado" }, 404);
   }
 
   const avatar = rows[0];
