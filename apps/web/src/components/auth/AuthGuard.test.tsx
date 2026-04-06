@@ -18,7 +18,13 @@ vi.mock("./LoginPage", () => ({
 }));
 
 vi.mock("./RegisterPage", () => ({
-  RegisterPage: () => <div data-testid="register-page">Register</div>,
+  RegisterPage: ({ onSwitch, onSuccess }: { onSwitch: () => void; onSuccess: (email: string) => void }) => (
+    <div data-testid="register-page">
+      Register
+      <button onClick={onSwitch}>Voltar</button>
+      <button onClick={() => onSuccess("test@example.com")}>Simulate Success</button>
+    </div>
+  ),
 }));
 
 vi.mock("./ForgotPasswordPage", () => ({
@@ -88,5 +94,36 @@ describe("AuthGuard", () => {
 
     expect(screen.getByTestId("register-page")).toBeInTheDocument();
     expect(screen.queryByTestId("login-page")).not.toBeInTheDocument();
+  });
+
+  it("shows verify-email view when RegisterPage calls onSuccess with email", async () => {
+    const user = userEvent.setup();
+    mockUseSession.mockReturnValue({ data: null, isPending: false });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    await user.click(screen.getByText("Criar conta"));
+    await user.click(screen.getByText("Simulate Success"));
+
+    expect(screen.getByText("Verifique seu e-mail")).toBeInTheDocument();
+    expect(screen.getByText(/test@example\.com/)).toBeInTheDocument();
+    expect(screen.queryByTestId("register-page")).not.toBeInTheDocument();
+  });
+
+  it("switches from verify-email back to login when clicking back button", async () => {
+    const user = userEvent.setup();
+    mockUseSession.mockReturnValue({ data: null, isPending: false });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    await user.click(screen.getByText("Criar conta"));
+    await user.click(screen.getByText("Simulate Success"));
+
+    expect(screen.getByText("Verifique seu e-mail")).toBeInTheDocument();
+
+    await user.click(screen.getByText("Voltar ao login"));
+
+    expect(screen.getByTestId("login-page")).toBeInTheDocument();
+    expect(screen.queryByText("Verifique seu e-mail")).not.toBeInTheDocument();
   });
 });
