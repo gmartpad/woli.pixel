@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import sharp from "sharp";
 import { eq, and, desc } from "drizzle-orm";
 import { storeAvatar } from "../services/storage";
-import { createPresignedDownloadUrl } from "../lib/s3";
+import { createPresignedDownloadUrl, deleteFromS3 } from "../lib/s3";
 import { auth } from "../auth";
 import { db } from "../db";
 import { avatarHistory } from "../db/schema";
@@ -116,4 +116,48 @@ profileRouter.put("/avatar/:id/restore", async (c) => {
     response.headers.append("Set-Cookie", cookie);
   }
   return response;
+});
+
+profileRouter.delete("/avatar/:id", async (c) => {
+  const user = c.get("user" as never) as { id: string; image?: string | null } | null;
+  if (!user) {
+    return c.json({ error: "Autenticação necessária" }, 401);
+  }
+
+  const { id } = c.req.param();
+
+  const rows = await db
+    .select()
+    .from(avatarHistory)
+    .where(and(eq(avatarHistory.id, id), eq(avatarHistory.userId, user.id)));
+
+  if (rows.length === 0) {
+    return c.json({ error: "Avatar não encontrado" }, 404);
+  }
+
+  const avatar = rows[0];
+
+  // Delete from DB
+  await db.delete(avatarHistory).where(eq(avatarHistory.id, id));
+
+  // Delete from S3
+  await deleteFromS3(avatar.s3Key);
+
+  // If deleting current avatar, clear user.image
+  const isCurrentAvatar = user.image === `/api/v1/avatar/${id}`;
+  if (isCurrentAvatar) {
+    const updateResult = await auth.api.updateUser({
+      body: { image: null },
+      headers: c.req.raw.headers,
+      returnHeaders: true,
+    });
+    const setCookieHeaders = updateResult.headers?.getSetCookie?.() ?? [];
+    const response = c.json({ data: { deleted: true, clearedCurrent: true } });
+    for (const cookie of setCookieHeaders) {
+      response.headers.append("Set-Cookie", cookie);
+    }
+    return response;
+  }
+
+  return c.json({ data: { deleted: true, clearedCurrent: false } });
 });

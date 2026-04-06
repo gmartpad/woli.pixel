@@ -328,3 +328,43 @@ describe("PUT /api/v1/profile/avatar/:id/restore", () => {
     expect(updateCall.body.image).toBe("/api/v1/avatar/av-old");
   });
 });
+
+describe("DELETE /api/v1/profile/avatar/:id", () => {
+  test("returns 401 when not authenticated", async () => {
+    const res = await app.request("/api/v1/profile/avatar/av-1", { method: "DELETE" });
+    expect(res.status).toBe(401);
+  });
+
+  test("returns 404 when avatar doesn't exist", async () => {
+    mockDbSelect.mockReturnValueOnce({
+      from: mock(() => ({
+        where: mock(() => Promise.resolve([])),
+      })),
+    });
+
+    const res = await app.request("/api/v1/profile/avatar/nonexistent", {
+      method: "DELETE",
+      headers: { cookie: "auth-session=valid" },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test("deletes avatar from DB and S3", async () => {
+    mockDbSelect.mockReturnValueOnce({
+      from: mock(() => ({
+        where: mock(() => Promise.resolve([
+          { id: "av-del", userId: "user-123", s3Key: "avatars/user-123/del.webp" },
+        ])),
+      })),
+    });
+
+    const res = await app.request("/api/v1/profile/avatar/av-del", {
+      method: "DELETE",
+      headers: { cookie: "auth-session=valid" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.deleted).toBe(true);
+  });
+});
