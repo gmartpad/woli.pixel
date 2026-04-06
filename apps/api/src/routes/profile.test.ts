@@ -7,8 +7,11 @@ const mockCreatePresignedDownloadUrl = mock(
   async () => "https://s3.amazonaws.com/avatar-presigned-url",
 );
 
+const mockBatchDeleteObjects = mock(async () => {});
+
 mock.module("../services/storage", () => ({
   storeAvatar: mockStoreAvatar,
+  batchDeleteObjects: mockBatchDeleteObjects,
 }));
 
 mock.module("../lib/s3", () => ({
@@ -359,6 +362,53 @@ describe("GET /api/v1/profile/avatar/history — lazy backfill", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data).toEqual([]);
+  });
+});
+
+describe("DELETE /api/v1/profile/avatar/bulk", () => {
+  test("returns 401 when not authenticated", async () => {
+    const res = await app.request("/api/v1/profile/avatar/bulk", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: ["av-1"] }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test("returns 400 when ids is empty", async () => {
+    const res = await app.request("/api/v1/profile/avatar/bulk", {
+      method: "DELETE",
+      headers: {
+        cookie: "auth-session=valid",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ids: [] }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("deletes multiple avatars and returns count", async () => {
+    mockDbSelect.mockReturnValueOnce({
+      from: mock(() => ({
+        where: mock(() => Promise.resolve([
+          { id: "av-b1", userId: "user-123", s3Key: "avatars/user-123/b1.webp" },
+          { id: "av-b2", userId: "user-123", s3Key: "avatars/user-123/b2.webp" },
+        ])),
+      })),
+    });
+
+    const res = await app.request("/api/v1/profile/avatar/bulk", {
+      method: "DELETE",
+      headers: {
+        cookie: "auth-session=valid",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ids: ["av-b1", "av-b2"] }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.deleted).toBe(2);
   });
 });
 

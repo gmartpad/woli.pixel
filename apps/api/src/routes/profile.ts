@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import sharp from "sharp";
-import { eq, and, desc, count, asc, ne } from "drizzle-orm";
-import { storeAvatar } from "../services/storage";
+import { eq, and, desc, count, asc, ne, inArray } from "drizzle-orm";
+import { storeAvatar, batchDeleteObjects } from "../services/storage";
 import { deleteFromS3, objectExists } from "../lib/s3";
 import { auth } from "../auth";
 import { db } from "../db";
@@ -195,6 +195,61 @@ profileRouter.put("/avatar/:id/restore", async (c) => {
     response.headers.append("Set-Cookie", cookie);
   }
   return response;
+});
+
+profileRouter.delete("/avatar/bulk", async (c) => {
+  const user = c.get("user" as never) as { id: string; image?: string | null } | null;
+  if (!user) {
+    return c.json({ error: "Autenticação necessária" }, 401);
+  }
+
+  const body = await c.req.json<{ ids: string[] }>();
+  if (!body.ids || body.ids.length === 0) {
+    return c.json({ error: "Nenhum avatar selecionado" }, 400);
+  }
+
+  // Only delete avatars that belong to this user
+  const rows = await db
+    .select()
+    .from(avatarHistory)
+    .where(and(
+      inArray(avatarHistory.id, body.ids),
+      eq(avatarHistory.userId, user.id),
+    ));
+
+  if (rows.length === 0) {
+    return c.json({ data: { deleted: 0, clearedCurrent: false } });
+  }
+
+  // Delete from DB
+  const idsToDelete = rows.map((r) => r.id);
+  await db
+    .delete(avatarHistory)
+    .where(inArray(avatarHistory.id, idsToDelete));
+
+  // Delete from S3
+  const s3Keys = rows.map((r) => r.s3Key);
+  await batchDeleteObjects(s3Keys);
+
+  // Check if current avatar was deleted
+  const currentAvatarId = user.image?.match(/\/api\/v1\/avatar\/(.+)/)?.[1];
+  const clearedCurrent = currentAvatarId ? idsToDelete.includes(currentAvatarId) : false;
+
+  if (clearedCurrent) {
+    const updateResult = await auth.api.updateUser({
+      body: { image: null },
+      headers: c.req.raw.headers,
+      returnHeaders: true,
+    });
+    const setCookieHeaders = updateResult.headers?.getSetCookie?.() ?? [];
+    const response = c.json({ data: { deleted: rows.length, clearedCurrent: true } });
+    for (const cookie of setCookieHeaders) {
+      response.headers.append("Set-Cookie", cookie);
+    }
+    return response;
+  }
+
+  return c.json({ data: { deleted: rows.length, clearedCurrent: false } });
 });
 
 profileRouter.delete("/avatar/:id", async (c) => {
