@@ -18,7 +18,7 @@ const registerFieldSchemas = {
 
 interface RegisterPageProps {
   onSwitch: () => void;
-  onSuccess: () => void;
+  onSuccess: (email: string) => void;
 }
 
 export function RegisterPage({ onSwitch, onSuccess }: RegisterPageProps) {
@@ -31,7 +31,6 @@ export function RegisterPage({ onSwitch, onSuccess }: RegisterPageProps) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
   const { theme, toggleTheme } = useThemeStore(
@@ -78,28 +77,13 @@ export function RegisterPage({ onSwitch, onSuccess }: RegisterPageProps) {
       if (result.error) {
         setError(translateAuthError(result.error.message ?? "Erro ao criar conta"));
       } else {
-        setVerificationSent(true);
+        onSuccess(email);
       }
     } catch {
       setError("Erro ao criar conta");
     } finally {
       setLoading(false);
     }
-  }
-
-  if (verificationSent) {
-    return (
-      <div className="mx-auto w-full max-w-sm space-y-4 text-center">
-        <h2 className="text-xl font-bold text-on-surface font-headline">Verifique seu e-mail</h2>
-        <p className="text-sm text-on-surface-variant">
-          Enviamos um link de verificação para <strong className="text-on-surface">{email}</strong>.
-          Clique no link para ativar sua conta.
-        </p>
-        <button onClick={onSwitch} className="text-sm font-medium text-primary hover:underline">
-          Voltar ao login
-        </button>
-      </div>
-    );
   }
 
   return (

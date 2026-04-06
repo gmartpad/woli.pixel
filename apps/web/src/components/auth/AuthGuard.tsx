@@ -11,8 +11,9 @@ interface AuthGuardProps {
 
 export function AuthGuard({ children }: AuthGuardProps) {
   const { data: session, isPending } = useSession();
-  const [view, setView] = useState<"login" | "register" | "forgot" | "reset">("login");
+  const [view, setView] = useState<"login" | "register" | "forgot" | "reset" | "verify-email">("login");
   const [resetToken, setResetToken] = useState<string | null>(null);
+  const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -46,7 +47,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
         {view === "register" && (
           <RegisterPage
             onSwitch={() => setView("login")}
-            onSuccess={() => setView("login")}
+            onSuccess={(email: string) => {
+              setVerificationEmail(email);
+              setView("verify-email");
+            }}
           />
         )}
         {view === "forgot" && (
@@ -62,6 +66,21 @@ export function AuthGuard({ children }: AuthGuardProps) {
               setView("login");
             }}
           />
+        )}
+        {view === "verify-email" && verificationEmail && (
+          <div className="mx-auto w-full max-w-sm space-y-4 text-center">
+            <h2 className="text-xl font-bold text-on-surface font-headline">Verifique seu e-mail</h2>
+            <p className="text-sm text-on-surface-variant">
+              Enviamos um link de verificação para <strong className="text-on-surface">{verificationEmail}</strong>.
+              Clique no link para ativar sua conta.
+            </p>
+            <button
+              onClick={() => setView("login")}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Voltar ao login
+            </button>
+          </div>
         )}
       </div>
     );
