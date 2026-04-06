@@ -8,6 +8,7 @@ import { brandsRouter } from "./routes/brands";
 import { auditsRouter } from "./routes/audits";
 import { qualityGatesRouter } from "./routes/quality-gates";
 import { generationCostRouter } from "./routes/generation-cost";
+import { avatarRouter } from "./routes/avatar";
 
 const app = new Hono();
 
@@ -37,6 +38,7 @@ app.route("/api/v1/brands", brandsRouter);
 app.route("/api/v1/audits", auditsRouter);
 app.route("/api/v1/quality-gates", qualityGatesRouter);
 app.route("/api/v1/generation-cost", generationCostRouter);
+app.route("/api/v1/avatar", avatarRouter);
 
 // 404 handler
 app.notFound((c) => {
