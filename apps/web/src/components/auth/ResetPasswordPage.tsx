@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { translateAuthError } from "@/lib/auth-errors";
 
 interface ResetPasswordPageProps {
   token: string;
@@ -31,7 +32,7 @@ export function ResetPasswordPage({ token, onBack }: ResetPasswordPageProps) {
       });
 
       if (result.error) {
-        setError(result.error.message || "Erro ao redefinir senha");
+        setError(translateAuthError(result.error.message ?? "Erro ao redefinir senha"));
       } else {
         setSuccess(true);
       }
