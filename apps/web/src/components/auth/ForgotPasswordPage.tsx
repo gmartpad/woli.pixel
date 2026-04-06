@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { translateAuthError } from "@/lib/auth-errors";
 
 interface ForgotPasswordPageProps {
   onBack: () => void;
@@ -23,7 +24,7 @@ export function ForgotPasswordPage({ onBack }: ForgotPasswordPageProps) {
       });
 
       if (result.error) {
-        setError(result.error.message || "Erro ao enviar e-mail");
+        setError(translateAuthError(result.error.message ?? "Erro ao enviar e-mail"));
       } else {
         setSent(true);
       }

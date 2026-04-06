@@ -33,7 +33,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  if (!session) {
+  if (!session || !session.user.emailVerified) {
     return (
       <div className="w-full">
         {view === "login" && (

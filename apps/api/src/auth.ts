@@ -24,12 +24,16 @@ export const auth = betterAuth({
     requireEmailVerification: true,
     sendResetPassword: async ({ user, url }) => {
       if (!resend) return;
-      void resend.emails.send({
-        from: fromEmail,
-        to: user.email,
-        subject: "Woli Pixel — Redefinir senha",
-        html: `<p>Olá ${user.name},</p><p><a href="${url}">Clique aqui para redefinir sua senha</a></p>`,
-      });
+      try {
+        await resend.emails.send({
+          from: fromEmail,
+          to: user.email,
+          subject: "Woli Pixel — Redefinir senha",
+          html: `<p>Olá ${user.name},</p><p><a href="${url}">Clique aqui para redefinir sua senha</a></p>`,
+        });
+      } catch (error) {
+        console.error("[auth] Failed to send reset password email:", error);
+      }
     },
   },
   emailVerification: {
@@ -37,12 +41,16 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
       if (!resend) return;
-      void resend.emails.send({
-        from: fromEmail,
-        to: user.email,
-        subject: "Woli Pixel — Verificar e-mail",
-        html: `<p>Olá ${user.name},</p><p><a href="${url}">Clique aqui para verificar seu e-mail</a></p>`,
-      });
+      try {
+        await resend.emails.send({
+          from: fromEmail,
+          to: user.email,
+          subject: "Woli Pixel — Verificar e-mail",
+          html: `<p>Olá ${user.name},</p><p><a href="${url}">Clique aqui para verificar seu e-mail</a></p>`,
+        });
+      } catch (error) {
+        console.error("[auth] Failed to send verification email:", error);
+      }
     },
   },
   socialProviders: {
