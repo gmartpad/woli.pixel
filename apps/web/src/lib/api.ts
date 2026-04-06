@@ -9,7 +9,14 @@ function apiFetch(url: string, options?: RequestInit): Promise<Response> {
 
 // ── Profile / Avatar Endpoints ───────────────
 
-export async function uploadAvatar(file: Blob): Promise<{ image_url: string }> {
+export interface AvatarHistoryEntry {
+  id: string;
+  url: string;
+  uploadedAt: string;
+  fileSize: number;
+}
+
+export async function uploadAvatar(file: Blob): Promise<{ id: string; url: string }> {
   const formData = new FormData();
   formData.append("file", file);
   const res = await apiFetch(`${API_URL}/profile/avatar`, {
@@ -20,7 +27,53 @@ export async function uploadAvatar(file: Blob): Promise<{ image_url: string }> {
     const err = await res.json();
     throw new Error(err.error || "Erro ao enviar foto");
   }
-  return res.json();
+  const body = await res.json();
+  return body.data;
+}
+
+export async function fetchAvatarHistory(): Promise<AvatarHistoryEntry[]> {
+  const res = await apiFetch(`${API_URL}/profile/avatar/history`);
+  if (!res.ok) throw new Error("Erro ao carregar histórico de fotos");
+  const body = await res.json();
+  return body.data;
+}
+
+export async function restoreAvatar(id: string): Promise<{ id: string; url: string }> {
+  const res = await apiFetch(`${API_URL}/profile/avatar/${id}/restore`, {
+    method: "PUT",
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Erro ao restaurar foto");
+  }
+  const body = await res.json();
+  return body.data;
+}
+
+export async function deleteAvatar(id: string): Promise<{ deleted: boolean; clearedCurrent: boolean }> {
+  const res = await apiFetch(`${API_URL}/profile/avatar/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Erro ao excluir foto");
+  }
+  const body = await res.json();
+  return body.data;
+}
+
+export async function bulkDeleteAvatars(ids: string[]): Promise<{ deleted: number; clearedCurrent: boolean }> {
+  const res = await apiFetch(`${API_URL}/profile/avatar/bulk`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Erro ao excluir fotos");
+  }
+  const body = await res.json();
+  return body.data;
 }
 
 // ── Existing Single-Image Endpoints ──────────
