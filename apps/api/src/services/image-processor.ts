@@ -1,8 +1,4 @@
 import sharp from "sharp";
-import path from "path";
-import { mkdir } from "fs/promises";
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
 
 export type ImageTypeSpec = {
   id: string;
@@ -19,7 +15,7 @@ export type ImageTypeSpec = {
 };
 
 export type ProcessResult = {
-  processedPath: string;
+  processedBuffer: Buffer;
   processedWidth: number;
   processedHeight: number;
   processedFormat: string;
@@ -28,15 +24,15 @@ export type ProcessResult = {
 };
 
 export async function processImage(
-  originalPath: string,
+  input: string | Buffer,
   targetSpec: ImageTypeSpec,
   crop?: { x: number; y: number; width: number; height: number }
 ): Promise<ProcessResult> {
   const adjustments: string[] = [];
 
-  // Read original image
-  let pipeline = sharp(originalPath);
-  const metadata = await sharp(originalPath).metadata();
+  // Read original image — Sharp handles both path strings and Buffers natively
+  let pipeline = sharp(input);
+  const metadata = await sharp(input).metadata();
   let originalWidth = metadata.width || 0;
   let originalHeight = metadata.height || 0;
 
@@ -59,7 +55,6 @@ export async function processImage(
   if (targetSpec.width && targetSpec.height) {
     if (originalWidth !== targetSpec.width || originalHeight !== targetSpec.height) {
       if (useTransparentContain) {
-        // Gamification/icon types: contain with transparent background (no crop)
         pipeline = pipeline.resize(targetSpec.width, targetSpec.height, {
           fit: "contain",
           background: { r: 0, g: 0, b: 0, alpha: 0 },
@@ -72,7 +67,6 @@ export async function processImage(
       }
       adjustments.push("resized");
 
-      // If aspect ratio differs significantly, it's also a crop (only for cover fit)
       if (!useTransparentContain) {
         const originalRatio = originalWidth / originalHeight;
         const targetRatio = targetSpec.width / targetSpec.height;
@@ -82,7 +76,6 @@ export async function processImage(
       }
     }
   } else if (targetSpec.minWidth && originalWidth < targetSpec.minWidth) {
-    // Variable width type but image is too small
     pipeline = pipeline.resize(targetSpec.minWidth, null, {
       fit: "inside",
       withoutEnlargement: false,
@@ -94,7 +87,6 @@ export async function processImage(
   let outputFormat = targetSpec.recommendedFormat;
   const originalFormat = metadata.format || "jpeg";
 
-  // Normalize format names
   const formatMap: Record<string, string> = {
     jpg: "jpeg",
     jpeg: "jpeg",
@@ -114,7 +106,6 @@ export async function processImage(
   const maxSizeBytes = targetSpec.maxFileSizeKb * 1024;
 
   if (normalizedTarget === "jpeg") {
-    // Start with quality 85 and reduce if needed
     let quality = 85;
     let buffer = await pipeline.clone().jpeg({ quality, mozjpeg: true }).toBuffer();
 
@@ -127,15 +118,9 @@ export async function processImage(
       adjustments.push("compressed");
     }
 
-    // Save the final buffer
-    await mkdir(UPLOAD_DIR, { recursive: true });
-    const outputFilename = `processed-${Date.now()}.jpg`;
-    const outputPath = path.join(UPLOAD_DIR, outputFilename);
-    await Bun.write(outputPath, buffer);
-
     const processedMeta = await sharp(buffer).metadata();
     return {
-      processedPath: outputPath,
+      processedBuffer: buffer,
       processedWidth: processedMeta.width || targetSpec.width || originalWidth,
       processedHeight: processedMeta.height || targetSpec.height || originalHeight,
       processedFormat: "jpeg",
@@ -145,7 +130,6 @@ export async function processImage(
   } else if (normalizedTarget === "png") {
     let buffer = await pipeline.clone().png({ compressionLevel: 9 }).toBuffer();
 
-    // If still too large, try with palette mode
     if (buffer.length > maxSizeBytes) {
       buffer = await pipeline.clone().png({ compressionLevel: 9, palette: true }).toBuffer();
     }
@@ -154,14 +138,9 @@ export async function processImage(
       adjustments.push("compressed");
     }
 
-    await mkdir(UPLOAD_DIR, { recursive: true });
-    const outputFilename = `processed-${Date.now()}.png`;
-    const outputPath = path.join(UPLOAD_DIR, outputFilename);
-    await Bun.write(outputPath, buffer);
-
     const processedMeta = await sharp(buffer).metadata();
     return {
-      processedPath: outputPath,
+      processedBuffer: buffer,
       processedWidth: processedMeta.width || targetSpec.width || originalWidth,
       processedHeight: processedMeta.height || targetSpec.height || originalHeight,
       processedFormat: "png",
@@ -182,14 +161,9 @@ export async function processImage(
       adjustments.push("compressed");
     }
 
-    await mkdir(UPLOAD_DIR, { recursive: true });
-    const outputFilename = `processed-${Date.now()}.webp`;
-    const outputPath = path.join(UPLOAD_DIR, outputFilename);
-    await Bun.write(outputPath, buffer);
-
     const processedMeta = await sharp(buffer).metadata();
     return {
-      processedPath: outputPath,
+      processedBuffer: buffer,
       processedWidth: processedMeta.width || targetSpec.width || originalWidth,
       processedHeight: processedMeta.height || targetSpec.height || originalHeight,
       processedFormat: "webp",
@@ -197,4 +171,81 @@ export async function processImage(
       adjustments,
     };
   }
+}
+
+/**
+ * Post-process an AI-generated image to exact target dimensions and format.
+ * Simpler than processImage — no user crop, no format detection needed.
+ */
+export async function postProcessGenerated(
+  imageBuffer: Buffer,
+  targetSpec: ImageTypeSpec,
+): Promise<ProcessResult> {
+  const adjustments: string[] = [];
+
+  let pipeline = sharp(imageBuffer);
+  const metadata = await sharp(imageBuffer).metadata();
+  const srcW = metadata.width || 1024;
+  const srcH = metadata.height || 1024;
+
+  // Resize to target if target has fixed dimensions
+  if (targetSpec.width && targetSpec.height) {
+    if (srcW !== targetSpec.width || srcH !== targetSpec.height) {
+      if (targetSpec.requiresTransparency) {
+        pipeline = pipeline.resize(targetSpec.width, targetSpec.height, {
+          fit: "contain",
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        });
+      } else {
+        pipeline = pipeline.resize(targetSpec.width, targetSpec.height, {
+          fit: "cover",
+          position: "centre",
+        });
+      }
+      adjustments.push("resized");
+    }
+  } else if (targetSpec.minWidth && srcW > targetSpec.minWidth) {
+    pipeline = pipeline.resize(targetSpec.minWidth, null, { fit: "inside" });
+    adjustments.push("resized");
+  }
+
+  // Format conversion and compression
+  const outputFormat = targetSpec.recommendedFormat === "jpg" ? "jpeg" : targetSpec.recommendedFormat;
+  const maxSizeBytes = targetSpec.maxFileSizeKb * 1024;
+
+  let buffer: Buffer;
+  if (outputFormat === "jpeg") {
+    let quality = 85;
+    buffer = await pipeline.clone().jpeg({ quality, mozjpeg: true }).toBuffer();
+    while (buffer.length > maxSizeBytes && quality > 20) {
+      quality -= 10;
+      buffer = await pipeline.clone().jpeg({ quality, mozjpeg: true }).toBuffer();
+    }
+  } else if (outputFormat === "png") {
+    buffer = await pipeline.clone().png({ compressionLevel: 9 }).toBuffer();
+    if (buffer.length > maxSizeBytes) {
+      buffer = await pipeline.clone().png({ compressionLevel: 9, palette: true }).toBuffer();
+    }
+  } else {
+    let quality = 85;
+    buffer = await pipeline.clone().webp({ quality }).toBuffer();
+    while (buffer.length > maxSizeBytes && quality > 20) {
+      quality -= 10;
+      buffer = await pipeline.clone().webp({ quality }).toBuffer();
+    }
+  }
+
+  if (buffer.length < imageBuffer.length) {
+    adjustments.push("compressed");
+  }
+
+  const processedMeta = await sharp(buffer).metadata();
+  return {
+    processedBuffer: buffer,
+    processedWidth: processedMeta.width || targetSpec.width || srcW,
+    processedHeight: processedMeta.height || targetSpec.height || srcH,
+    processedFormat: outputFormat,
+    processedSizeKb: Math.round(buffer.length / 1024),
+    adjustments,
+  };
 }

@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { auth } from "./auth";
+import { requireAuth } from "./middleware/auth";
 import { imageTypesRouter } from "./routes/image-types";
 import { imagesRouter } from "./routes/images";
 import { batchesRouter } from "./routes/batches";
@@ -8,6 +10,8 @@ import { brandsRouter } from "./routes/brands";
 import { auditsRouter } from "./routes/audits";
 import { qualityGatesRouter } from "./routes/quality-gates";
 import { generationCostRouter } from "./routes/generation-cost";
+import { generateRouter } from "./routes/generate";
+import { profileRouter } from "./routes/profile";
 import { avatarRouter } from "./routes/avatar";
 
 const app = new Hono();
@@ -19,9 +23,16 @@ app.use("*", cors({
     ? (process.env.CORS_ORIGIN || "*").split(",")
     : ["http://localhost:5173", "http://localhost:3000"],
   credentials: true,
+  allowHeaders: ["Content-Type", "Authorization"],
+  allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 }));
 
-// Health check
+// Auth routes (must be BEFORE other routes)
+app.on(["POST", "GET"], "/api/auth/*", (c) => {
+  return auth.handler(c.req.raw);
+});
+
+// Health check (public)
 app.get("/api/v1/health", (c) => {
   return c.json({
     status: "ok",
@@ -30,14 +41,26 @@ app.get("/api/v1/health", (c) => {
   });
 });
 
-// Routes
+// Public routes
 app.route("/api/v1/image-types", imageTypesRouter);
+app.route("/api/v1/generation-cost", generationCostRouter);
+
+// Protected routes — require auth middleware
+app.use("/api/v1/images/*", requireAuth);
+app.use("/api/v1/batches/*", requireAuth);
+app.use("/api/v1/brands/*", requireAuth);
+app.use("/api/v1/audits/*", requireAuth);
+app.use("/api/v1/quality-gates/*", requireAuth);
+app.use("/api/v1/generate/*", requireAuth);
+app.use("/api/v1/profile/*", requireAuth);
+
 app.route("/api/v1/images", imagesRouter);
 app.route("/api/v1/batches", batchesRouter);
 app.route("/api/v1/brands", brandsRouter);
 app.route("/api/v1/audits", auditsRouter);
 app.route("/api/v1/quality-gates", qualityGatesRouter);
-app.route("/api/v1/generation-cost", generationCostRouter);
+app.route("/api/v1/generate", generateRouter);
+app.route("/api/v1/profile", profileRouter);
 app.route("/api/v1/avatar", avatarRouter);
 
 // 404 handler

@@ -4,12 +4,9 @@ import { auditJobs, auditItems, imageTypes } from "../db/schema";
 import { eq, asc, desc, sql } from "drizzle-orm";
 import { analyzeImage } from "../services/ai";
 import { extractMetadata } from "../services/upload-validator";
-import sharp from "sharp";
-import path from "path";
-import { mkdir } from "fs/promises";
+import { storeAuditImage, getImageBuffer, batchDeleteObjects } from "../services/storage";
 
 const auditsRouter = new Hono();
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
 const AUDIT_AI_CONCURRENCY = parseInt(process.env.AUDIT_AI_CONCURRENCY || "3");
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
@@ -67,8 +64,6 @@ auditsRouter.post("/:id/upload", async (c) => {
     if (!job) return c.json({ error: "Auditoria não encontrada" }, 404);
 
     const formData = await c.req.formData();
-    const auditDir = path.join(UPLOAD_DIR, "audits", id);
-    await mkdir(auditDir, { recursive: true });
 
     const files: File[] = [];
     for (const [, value] of formData.entries()) {
@@ -84,9 +79,9 @@ auditsRouter.post("/:id/upload", async (c) => {
     for (const file of files) {
       const buffer = Buffer.from(await file.arrayBuffer());
       const meta = await extractMetadata(buffer);
-      const savedFilename = `${Date.now()}-${file.name}`;
-      const filePath = path.join(auditDir, savedFilename);
-      await Bun.write(filePath, buffer);
+
+      // Store in S3
+      const s3Key = await storeAuditImage(id, file.name, buffer, file.type);
 
       const [item] = await db.insert(auditItems).values({
         auditJobId: id,
@@ -95,7 +90,7 @@ auditsRouter.post("/:id/upload", async (c) => {
         originalHeight: meta.height,
         originalSizeKb: meta.sizeKb,
         originalFormat: meta.format,
-        filePath: filePath,
+        s3Key,
         status: "pending",
       }).returning();
       created.push(item);
@@ -124,9 +119,6 @@ auditsRouter.post("/:id/add-urls", async (c) => {
     const urls: string[] = body.urls || [];
     if (urls.length === 0) return c.json({ error: "Nenhuma URL fornecida" }, 400);
 
-    const auditDir = path.join(UPLOAD_DIR, "audits", id);
-    await mkdir(auditDir, { recursive: true });
-
     let added = 0;
     let errors = 0;
 
@@ -138,9 +130,15 @@ auditsRouter.post("/:id/add-urls", async (c) => {
         const buffer = Buffer.from(await response.arrayBuffer());
         const meta = await extractMetadata(buffer);
         const filename = url.split("/").pop() || `url-image-${Date.now()}`;
-        const savedFilename = `${Date.now()}-${filename}`;
-        const filePath = path.join(auditDir, savedFilename);
-        await Bun.write(filePath, buffer);
+
+        // Infer content type
+        const contentType = meta.format === "png" ? "image/png"
+          : meta.format === "gif" ? "image/gif"
+          : meta.format === "webp" ? "image/webp"
+          : "image/jpeg";
+
+        // Store in S3
+        const s3Key = await storeAuditImage(id, filename, buffer, contentType);
 
         await db.insert(auditItems).values({
           auditJobId: id,
@@ -150,7 +148,7 @@ auditsRouter.post("/:id/add-urls", async (c) => {
           originalHeight: meta.height,
           originalSizeKb: meta.sizeKb,
           originalFormat: meta.format,
-          filePath: filePath,
+          s3Key,
           status: "pending",
         });
         added++;
@@ -197,12 +195,13 @@ auditsRouter.post("/:id/scan", async (c) => {
     const types = await db.select().from(imageTypes);
 
     const tasks = pending.map((item) => async () => {
-      if (!item.filePath) throw new Error("Arquivo não disponível");
+      if (!item.s3Key) throw new Error("Arquivo não disponível");
 
       await db.update(auditItems).set({ status: "scanning" }).where(eq(auditItems.id, item.id));
 
-      const fileBuffer = await Bun.file(item.filePath).arrayBuffer();
-      const base64 = Buffer.from(fileBuffer).toString("base64");
+      // Read from S3
+      const imageBuffer = await getImageBuffer(item.s3Key);
+      const base64 = Buffer.from(imageBuffer).toString("base64");
       const fmt = item.originalFormat || "jpeg";
       const mimeType = fmt === "png" ? "image/png" : fmt === "gif" ? "image/gif" : fmt === "webp" ? "image/webp" : "image/jpeg";
       const dataUrl = `data:${mimeType};base64,${base64}`;
@@ -394,15 +393,21 @@ auditsRouter.delete("/:id", async (c) => {
   const [job] = await db.select().from(auditJobs).where(eq(auditJobs.id, id));
   if (!job) return c.json({ error: "Auditoria não encontrada" }, 404);
 
+  // Collect S3 keys for cleanup
+  const items = await db.select({ s3Key: auditItems.s3Key })
+    .from(auditItems)
+    .where(eq(auditItems.auditJobId, id));
+
+  const s3Keys = items.map(i => i.s3Key).filter((k): k is string => k !== null);
+
+  // Delete DB records
   await db.delete(auditItems).where(eq(auditItems.auditJobId, id));
   await db.delete(auditJobs).where(eq(auditJobs.id, id));
 
-  // Clean up files
-  const auditDir = path.join(UPLOAD_DIR, "audits", id);
-  try {
-    const { rm } = await import("fs/promises");
-    await rm(auditDir, { recursive: true, force: true });
-  } catch {}
+  // Clean up S3 objects
+  if (s3Keys.length > 0) {
+    await batchDeleteObjects(s3Keys).catch(() => {});
+  }
 
   return c.json({ deleted: true });
 });

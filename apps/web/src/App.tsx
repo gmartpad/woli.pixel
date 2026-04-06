@@ -29,8 +29,15 @@ import { GateConfigManager } from "@/components/gates/GateConfigManager";
 import { GateTestPanel } from "@/components/gates/GateTestPanel";
 import { GateResultsDashboard } from "@/components/gates/GateResultsDashboard";
 import { useGateStore } from "@/stores/gate-store";
+// Feature 6: Image Generation
+import { GeneratePanel } from "@/components/GeneratePanel";
+import { AuthGuard } from "@/components/auth/AuthGuard";
+import { AvatarDropdown } from "@/components/header/AvatarDropdown";
+import { SettingsPage } from "@/components/settings/SettingsPage";
+import { useSession } from "@/lib/auth-client";
 
-type AppMode = "single" | "batch" | "brands" | "audit" | "gates";
+type AppMode = "single" | "batch" | "brands" | "audit" | "gates" | "generate";
+type HeaderPage = "dashboard" | "history" | "settings";
 
 const NAV_ITEMS: { id: AppMode; label: string; icon: React.ReactNode }[] = [
   {
@@ -78,6 +85,15 @@ const NAV_ITEMS: { id: AppMode; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
+  {
+    id: "generate",
+    label: "Gerar Imagem",
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+      </svg>
+    ),
+  },
 ];
 
 function App() {
@@ -85,7 +101,9 @@ function App() {
   const { theme, toggleTheme } = useThemeStore();
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
   const [activeNav, setActiveNav] = useState<AppMode>("single");
+  const [activePage, setActivePage] = useState<HeaderPage>("dashboard");
   const gateSelectedConfigId = useGateStore((s) => s.selectedConfigId);
+  const { data: session, isPending: authPending } = useSession();
 
   useEffect(() => {
     if (sidebarOpen && window.innerWidth < 1024) {
@@ -95,6 +113,22 @@ function App() {
     }
     return () => { document.body.style.overflow = ""; };
   }, [sidebarOpen]);
+
+  if (authPending) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-container-low text-on-surface">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-container-low text-on-surface px-4">
+        <AuthGuard><div /></AuthGuard>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen text-on-surface">
@@ -141,6 +175,7 @@ function App() {
               key={item.id}
               onClick={() => {
                 setActiveNav(item.id);
+                setActivePage("dashboard");
                 if (window.innerWidth < 1024) setSidebarOpen(false);
               }}
               className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
@@ -198,17 +233,21 @@ function App() {
             </button>
             {/* Header Tabs */}
             <nav className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-              {["Dashboard", "Histórico", "Configurações"].map((tab, i) => (
-                <span
-                  key={tab}
+              {([
+                { label: "Dashboard", page: "dashboard" as HeaderPage },
+                { label: "Histórico", page: "history" as HeaderPage },
+              ]).map((tab) => (
+                <button
+                  key={tab.page}
+                  onClick={() => setActivePage(tab.page)}
                   className={`whitespace-nowrap px-3 py-1.5 text-sm font-medium transition-colors font-headline ${
-                    i === 0
+                    activePage === tab.page
                       ? "text-primary border-b-2 border-primary"
                       : "text-outline hover:text-on-surface-variant"
                   }`}
                 >
-                  {tab}
-                </span>
+                  {tab.label}
+                </button>
               ))}
             </nav>
           </div>
@@ -223,24 +262,41 @@ function App() {
             </button>
 
             {/* Settings gear */}
-            <button className="hidden sm:block rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface">
+            <button
+              onClick={() => setActivePage("settings")}
+              className="hidden sm:block rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+            >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </button>
 
-            {/* User avatar */}
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary text-xs font-bold text-white shadow-[0_0_10px_rgba(133,173,255,0.2)]">
-              GM
-            </div>
+            {/* User avatar dropdown */}
+            <AvatarDropdown session={session} onNavigateSettings={() => setActivePage("settings")} />
           </div>
         </header>
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-8">
+          {activePage === "settings" && (
+            <AuthGuard>
+              <SettingsPage session={session} />
+            </AuthGuard>
+          )}
+
+          {activePage === "history" && (
+            <AuthGuard>
+              <div className="mx-auto max-w-6xl">
+                <ProcessingHistory />
+              </div>
+            </AuthGuard>
+          )}
+
+          {activePage === "dashboard" && (
           <div className="mx-auto max-w-6xl space-y-6">
             <ErrorBanner />
+            <AuthGuard>
 
             {/* ── Single Image Mode ── */}
             {activeNav === "single" && (
@@ -302,7 +358,12 @@ function App() {
                 )}
               </div>
             )}
+
+            {/* ── Image Generation ── */}
+            {activeNav === "generate" && <GeneratePanel />}
+            </AuthGuard>
           </div>
+          )}
         </main>
       </div>
     </div>

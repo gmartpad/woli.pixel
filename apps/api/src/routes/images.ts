@@ -4,13 +4,11 @@ import { imageUploads, imageTypes } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { analyzeImage, generateExplanation } from "../services/ai";
 import { processImage } from "../services/image-processor";
+import { storeOriginal, storeProcessed, getImageBuffer, getDownloadUrl } from "../services/storage";
 import sharp from "sharp";
-import path from "path";
-import { mkdir } from "fs/promises";
 
 const imagesRouter = new Hono();
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
 const MAX_FILE_SIZE = (parseInt(process.env.MAX_FILE_SIZE_MB || "10")) * 1024 * 1024;
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
@@ -43,27 +41,26 @@ imagesRouter.post("/upload", async (c) => {
     const sharp = (await import("sharp")).default;
     const metadata = await sharp(buffer).metadata();
 
-    // Save file to disk
-    await mkdir(UPLOAD_DIR, { recursive: true });
-    const ext = file.name.split(".").pop() || "jpg";
-    const timestamp = Date.now();
-    const savedFilename = `${timestamp}-${file.name}`;
-    const filePath = path.join(UPLOAD_DIR, savedFilename);
-    await Bun.write(filePath, buffer);
-
     // Determine format
-    const format = metadata.format || ext;
+    const format = metadata.format || file.name.split(".").pop() || "jpg";
 
-    // Insert into database
+    // Insert into database first to get the upload ID
     const [upload] = await db.insert(imageUploads).values({
       originalFilename: file.name,
       originalFormat: format,
       originalWidth: metadata.width || 0,
       originalHeight: metadata.height || 0,
       originalSizeKb: Math.round(file.size / 1024),
-      originalPath: filePath,
       status: "uploaded",
     }).returning();
+
+    // Store original in S3
+    const s3Key = await storeOriginal(upload.id, file.name, buffer, file.type);
+
+    // Update with S3 key
+    await db.update(imageUploads).set({
+      originalS3Key: s3Key,
+    }).where(eq(imageUploads.id, upload.id));
 
     return c.json({
       id: upload.id,
@@ -109,9 +106,9 @@ imagesRouter.post("/:id/analyze", async (c) => {
     // Get all image types for classification context
     const types = await db.select().from(imageTypes);
 
-    // Read the file for AI analysis
-    const fileBuffer = await Bun.file(upload.originalPath!).arrayBuffer();
-    const base64 = Buffer.from(fileBuffer).toString("base64");
+    // Read the file from S3 for AI analysis
+    const imageBuffer = await getImageBuffer(upload.originalS3Key!);
+    const base64 = Buffer.from(imageBuffer).toString("base64");
     const mimeType = upload.originalFormat === "png" ? "image/png"
       : upload.originalFormat === "gif" ? "image/gif"
       : upload.originalFormat === "webp" ? "image/webp"
@@ -205,8 +202,12 @@ imagesRouter.post("/:id/process", async (c) => {
       updatedAt: new Date(),
     }).where(eq(imageUploads.id, id));
 
-    // Process image with Sharp
-    const processResult = await processImage(upload.originalPath!, targetType, body.crop);
+    // Get image buffer from S3 and process
+    const imageBuffer = await getImageBuffer(upload.originalS3Key!);
+    const processResult = await processImage(imageBuffer, targetType, body.crop);
+
+    // Store processed image in S3
+    const processedS3Key = await storeProcessed(id, processResult.processedBuffer, processResult.processedFormat);
 
     // Generate AI explanation (Step 3 of pipeline)
     const explanation = await generateExplanation(
@@ -234,7 +235,7 @@ imagesRouter.post("/:id/process", async (c) => {
       processedSizeKb: processResult.processedSizeKb,
       adjustmentsMade: processResult.adjustments,
       aiExplanation: explanation,
-      processedPath: processResult.processedPath,
+      processedS3Key,
       status: "processed",
       updatedAt: new Date(),
     }).where(eq(imageUploads.id, id));
@@ -273,12 +274,31 @@ imagesRouter.get("/:id/download", async (c) => {
   const id = c.req.param("id");
   const [upload] = await db.select().from(imageUploads).where(eq(imageUploads.id, id));
 
-  if (!upload || !upload.processedPath) {
+  if (!upload || !upload.processedS3Key) {
     return c.json({ error: "Imagem processada não encontrada" }, 404);
   }
 
-  const file = Bun.file(upload.processedPath);
-  const buffer = await file.arrayBuffer();
+  const requestedFormat = c.req.query("format"); // "png" | "jpg" | "webp" | undefined
+  const storedFormat = upload.processedFormat || "jpeg";
+
+  // Normalize "jpg" → "jpeg" for comparison
+  const normalizedRequested = requestedFormat === "jpg" ? "jpeg" : requestedFormat;
+
+  // No format conversion: redirect to presigned S3 URL
+  if (!normalizedRequested || normalizedRequested === storedFormat) {
+    const ext = storedFormat === "jpeg" ? "jpg" : storedFormat;
+    const downloadName = upload.originalFilename.replace(/\.[^.]+$/, `_processed.${ext}`);
+    const url = await getDownloadUrl(upload.processedS3Key, downloadName);
+    return c.redirect(url);
+  }
+
+  // Format conversion requested: download from S3, convert, stream response
+  const buffer = await getImageBuffer(upload.processedS3Key);
+  const converted = sharp(Buffer.from(buffer));
+  if (normalizedRequested === "png") converted.png();
+  else if (normalizedRequested === "jpeg") converted.jpeg({ quality: 85, mozjpeg: true });
+  else if (normalizedRequested === "webp") converted.webp({ quality: 85 });
+  const finalBuffer = await converted.toBuffer();
 
   const mimeMap: Record<string, string> = {
     jpeg: "image/jpeg",
@@ -288,31 +308,11 @@ imagesRouter.get("/:id/download", async (c) => {
     gif: "image/gif",
   };
 
-  const requestedFormat = c.req.query("format"); // "png" | "jpg" | "webp" | undefined
-  const storedFormat = upload.processedFormat || "jpeg";
-
-  let finalBuffer: ArrayBuffer | Buffer = buffer;
-  let finalFormat = storedFormat;
-
-  if (
-    requestedFormat &&
-    requestedFormat !== storedFormat &&
-    requestedFormat !== (storedFormat === "jpeg" ? "jpg" : storedFormat)
-  ) {
-    const converted = sharp(Buffer.from(buffer));
-    if (requestedFormat === "png") converted.png();
-    else if (requestedFormat === "jpg" || requestedFormat === "jpeg") converted.jpeg({ quality: 85, mozjpeg: true });
-    else if (requestedFormat === "webp") converted.webp({ quality: 85 });
-    finalBuffer = await converted.toBuffer();
-    finalFormat = requestedFormat === "jpg" ? "jpeg" : requestedFormat;
-  }
-
-  const contentType = mimeMap[finalFormat] || "application/octet-stream";
-  const ext = finalFormat === "jpeg" ? "jpg" : finalFormat;
+  const contentType = mimeMap[normalizedRequested] || "application/octet-stream";
+  const ext = normalizedRequested === "jpeg" ? "jpg" : normalizedRequested;
   const downloadName = upload.originalFilename.replace(/\.[^.]+$/, `_processed.${ext}`);
 
-  const responseBody = finalBuffer instanceof ArrayBuffer ? finalBuffer : new Uint8Array(finalBuffer);
-  return new Response(responseBody, {
+  return new Response(new Uint8Array(finalBuffer), {
     headers: {
       "Content-Type": contentType,
       "Content-Disposition": `attachment; filename="${downloadName}"`,

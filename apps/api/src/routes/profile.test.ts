@@ -68,10 +68,21 @@ const mockDbSelect = mock(() => mockDbQuery);
 const mockDbDelete = mock(() => ({
   where: mock(() => Promise.resolve()),
 }));
+const mockDbInsert = mock(() => ({
+  values: mock(() => ({
+    returning: mock(() => Promise.resolve([{ id: "new-avatar-id" }])),
+  })),
+}));
+const mockCountResult = mock(() => ({
+  from: mock(() => ({
+    where: mock(() => Promise.resolve([{ value: 1 }])),
+  })),
+}));
 
 mock.module("../db", () => ({
   db: {
     select: mockDbSelect,
+    insert: mockDbInsert,
     delete: mockDbDelete,
   },
 }));
@@ -129,6 +140,9 @@ beforeEach(() => {
   mockSharpInstance.resize.mockClear();
   mockSharpInstance.webp.mockClear();
   mockSharpInstance.toBuffer.mockClear();
+  mockDbInsert.mockClear();
+  mockDbSelect.mockClear();
+  mockDbDelete.mockClear();
 });
 
 describe("POST /api/v1/profile/avatar", () => {
@@ -197,6 +211,9 @@ describe("POST /api/v1/profile/avatar", () => {
   });
 
   test("processes image with Sharp, uploads to S3, updates user, and returns URL", async () => {
+    // Mock the count query for the 20-limit check
+    mockDbSelect.mockReturnValueOnce(mockCountResult());
+
     const formData = new FormData();
     formData.append("file", createTestPngBlob(), "avatar.png");
 
@@ -208,7 +225,7 @@ describe("POST /api/v1/profile/avatar", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.image_url).toBe("https://s3.amazonaws.com/avatar-presigned-url");
+    expect(body.data.url).toContain("/api/v1/avatar/");
 
     // Sharp called with 256x256 cover resize + webp
     expect(mockSharpInstance.resize).toHaveBeenCalledWith(256, 256, {
@@ -221,19 +238,17 @@ describe("POST /api/v1/profile/avatar", () => {
     expect(mockStoreAvatar).toHaveBeenCalledTimes(1);
     expect(mockStoreAvatar.mock.calls[0][0]).toBe("user-123");
 
-    // Presigned URL generated
-    expect(mockCreatePresignedDownloadUrl).toHaveBeenCalledTimes(1);
-
-    // User updated via better-auth with returnHeaders
+    // User updated via better-auth with returnHeaders and proxy URL
     expect(mockUpdateUser).toHaveBeenCalledTimes(1);
     const updateCall = mockUpdateUser.mock.calls[0][0];
-    expect(updateCall.body.image).toBe(
-      "https://s3.amazonaws.com/avatar-presigned-url",
-    );
+    expect(updateCall.body.image).toContain("/api/v1/avatar/");
     expect(updateCall.returnHeaders).toBe(true);
   });
 
   test("forwards Set-Cookie headers from better-auth to the client", async () => {
+    // Mock the count query for the 20-limit check
+    mockDbSelect.mockReturnValueOnce(mockCountResult());
+
     const formData = new FormData();
     formData.append("file", createTestPngBlob(), "avatar.png");
 

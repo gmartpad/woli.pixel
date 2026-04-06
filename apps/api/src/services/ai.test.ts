@@ -73,3 +73,48 @@ describe("generateExplanation", () => {
     expect(result.length).toBeGreaterThan(0);
   });
 });
+
+describe("analyzeModeration", () => {
+  test("returns analysis and suggestedPrompt", async () => {
+    const { analyzeModeration } = await import("./ai");
+
+    // Mock returns a nano-model response with the expected schema
+    createSpy.mockImplementationOnce(() =>
+      Promise.resolve({
+        output_text: JSON.stringify({
+          analysis: "O prompt menciona 'Darth Vader', personagem protegido por direitos autorais.",
+          suggested_prompt: "Um cavaleiro espacial com armadura escura andando de quadriciclo",
+        }),
+      })
+    );
+
+    const result = await analyzeModeration("Darth Vader andando de quadriciclo");
+
+    expect(result).toHaveProperty("analysis");
+    expect(result).toHaveProperty("suggestedPrompt");
+    expect(typeof result.analysis).toBe("string");
+    expect(typeof result.suggestedPrompt).toBe("string");
+    expect(result.analysis.length).toBeGreaterThan(0);
+    expect(result.suggestedPrompt.length).toBeGreaterThan(0);
+  });
+
+  test("calls gpt-4.1-nano (cheapest model)", async () => {
+    const { analyzeModeration } = await import("./ai");
+
+    createSpy.mockClear();
+    createSpy.mockImplementationOnce(() =>
+      Promise.resolve({
+        output_text: JSON.stringify({
+          analysis: "Motivo da moderação.",
+          suggested_prompt: "Prompt alternativo",
+        }),
+      })
+    );
+
+    await analyzeModeration("test prompt");
+
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    const callArgs = createSpy.mock.calls[0][0] as Record<string, unknown>;
+    expect(callArgs.model).toBe("gpt-4.1-nano");
+  });
+});

@@ -5,11 +5,9 @@ import { eq } from "drizzle-orm";
 import { validateFile, extractMetadata } from "../services/upload-validator";
 import { analyzeImage, generateExplanation } from "../services/ai";
 import { processImage } from "../services/image-processor";
-import path from "path";
-import { mkdir } from "fs/promises";
+import { storeOriginal, storeProcessed, getImageBuffer } from "../services/storage";
 
 const batchesRouter = new Hono();
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
 const BATCH_AI_CONCURRENCY = parseInt(process.env.BATCH_AI_CONCURRENCY || "3");
 
 // POST /api/v1/batches — Create batch job
@@ -42,24 +40,27 @@ batchesRouter.post("/:batchId/upload", async (c) => {
     const buffer = Buffer.from(await file!.arrayBuffer());
     const meta = await extractMetadata(buffer);
 
-    await mkdir(UPLOAD_DIR, { recursive: true });
-    const savedFilename = `${Date.now()}-${file!.name}`;
-    const filePath = path.join(UPLOAD_DIR, savedFilename);
-    await Bun.write(filePath, buffer);
-
     const newIndex = batch.totalImages + 1;
 
+    // Insert DB record first to get upload ID
     const [upload] = await db.insert(imageUploads).values({
       originalFilename: file!.name,
       originalFormat: meta.format,
       originalWidth: meta.width,
       originalHeight: meta.height,
       originalSizeKb: meta.sizeKb,
-      originalPath: filePath,
       status: "uploaded",
       batchId: batchId,
       batchIndex: newIndex,
     }).returning();
+
+    // Store original in S3
+    const s3Key = await storeOriginal(upload.id, file!.name, buffer, file!.type);
+
+    // Update with S3 key
+    await db.update(imageUploads).set({
+      originalS3Key: s3Key,
+    }).where(eq(imageUploads.id, upload.id));
 
     await db.update(batchJobs).set({
       totalImages: newIndex,
@@ -126,8 +127,9 @@ batchesRouter.post("/:batchId/analyze", async (c) => {
     const tasks = uploads.map((upload) => async () => {
       if (upload.status === "analyzed" && upload.aiAnalysisJson) return;
 
-      const fileBuffer = await Bun.file(upload.originalPath!).arrayBuffer();
-      const base64 = Buffer.from(fileBuffer).toString("base64");
+      // Read from S3
+      const imageBuffer = await getImageBuffer(upload.originalS3Key!);
+      const base64 = Buffer.from(imageBuffer).toString("base64");
       const mimeType = upload.originalFormat === "png" ? "image/png"
         : upload.originalFormat === "gif" ? "image/gif"
         : upload.originalFormat === "webp" ? "image/webp"
@@ -157,7 +159,6 @@ batchesRouter.post("/:batchId/analyze", async (c) => {
         if (r.status === "fulfilled") completed++;
         else {
           failed++;
-          // Try to mark individual image as error
           const upload = uploads[results.indexOf(r)];
           if (upload) {
             await db.update(imageUploads).set({
@@ -215,7 +216,12 @@ batchesRouter.post("/:batchId/process", async (c) => {
         updatedAt: new Date(),
       }).where(eq(imageUploads.id, upload.id));
 
-      const processResult = await processImage(upload.originalPath!, targetType);
+      // Get image from S3 and process in memory
+      const imageBuffer = await getImageBuffer(upload.originalS3Key!);
+      const processResult = await processImage(imageBuffer, targetType);
+
+      // Store processed result in S3
+      const processedS3Key = await storeProcessed(upload.id, processResult.processedBuffer, processResult.processedFormat);
 
       const explanation = await generateExplanation(
         { width: upload.originalWidth, height: upload.originalHeight, format: upload.originalFormat, sizeKb: upload.originalSizeKb },
@@ -231,7 +237,7 @@ batchesRouter.post("/:batchId/process", async (c) => {
         processedSizeKb: processResult.processedSizeKb,
         adjustmentsMade: processResult.adjustments,
         aiExplanation: explanation,
-        processedPath: processResult.processedPath,
+        processedS3Key,
         status: "processed",
         updatedAt: new Date(),
       }).where(eq(imageUploads.id, upload.id));

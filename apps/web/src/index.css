@@ -52,6 +52,14 @@
   --font-body: 'Inter', system-ui, sans-serif;
   --font-label: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Animations */
+  --animate-fade-slide-in: fadeSlideIn 250ms ease-out;
+
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 }
 
 /* ── Design Tokens (glow + glass + scrollbar vars) ── */

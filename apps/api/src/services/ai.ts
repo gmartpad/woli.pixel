@@ -241,3 +241,54 @@ Tipo alvo: ${targetTypeName}`,
 
   return response.output_text;
 }
+
+export type ModerationAnalysis = {
+  analysis: string;
+  suggestedPrompt: string;
+};
+
+const moderationAnalysisSchema = {
+  type: "object" as const,
+  properties: {
+    analysis: {
+      type: "string" as const,
+      description: "Explicação em português brasileiro do motivo da rejeição, identificando quais partes do prompt violaram a política de conteúdo",
+    },
+    suggested_prompt: {
+      type: "string" as const,
+      description: "Prompt alternativo que mantém a intenção original mas evita as violações identificadas",
+    },
+  },
+  required: ["analysis", "suggested_prompt"],
+  additionalProperties: false,
+};
+
+export async function analyzeModeration(prompt: string): Promise<ModerationAnalysis> {
+  const response = await openai.responses.create({
+    model: "gpt-4.1-nano",
+    input: [
+      {
+        role: "system",
+        content: `Você é um assistente que analisa prompts de geração de imagem que foram rejeitados por políticas de conteúdo. Identifique quais partes do prompt provavelmente causaram a rejeição (personagens protegidos por direitos autorais, conteúdo violento, marcas registradas, etc.) e sugira um prompt alternativo que mantenha a mesma intenção criativa mas evite as violações. Responda em português brasileiro.`,
+      },
+      {
+        role: "user",
+        content: `O seguinte prompt de geração de imagem foi rejeitado pela política de conteúdo:\n\n"${prompt}"\n\nAnalise o motivo da rejeição e sugira uma alternativa.`,
+      },
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "moderation_analysis",
+        strict: true,
+        schema: moderationAnalysisSchema,
+      },
+    },
+  });
+
+  const parsed = JSON.parse(response.output_text);
+  return {
+    analysis: parsed.analysis,
+    suggestedPrompt: parsed.suggested_prompt,
+  };
+}
