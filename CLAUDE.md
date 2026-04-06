@@ -2,6 +2,10 @@
 
 > **Assistente Inteligente de Validacao de Imagens** — AI-powered image validation, processing, and generation for the Woli EdTech platform.
 
+## Git Policy
+
+- **NEVER commit.** Claude must NEVER run `git commit`, `git add`, or any git write operation. The user will ALWAYS commit manually. No exceptions, no matter what the user asks in a single message — this rule is permanent.
+
 ## Project Context
 
 - **Hackathon IA Woli 2026** (01/04-08/04/2026) — 7-day internal hackathon

@@ -32,8 +32,8 @@ export function AuditReport() {
             <div className="text-2xl font-bold text-on-surface">{report.summary.total}</div>
             <div className="text-xs text-on-surface-variant">Total</div>
           </div>
-          <div className="rounded-lg bg-emerald-500/10 p-3 text-center">
-            <div className="text-2xl font-bold text-emerald-400">{report.summary.passed}</div>
+          <div className="rounded-lg bg-success-container p-3 text-center">
+            <div className="text-2xl font-bold text-success">{report.summary.passed}</div>
             <div className="text-xs text-on-surface-variant">Aprovadas</div>
           </div>
           <div className="rounded-lg bg-error/10 p-3 text-center">
@@ -82,7 +82,7 @@ export function AuditReport() {
             {report.worst_offenders.map((item, i) => (
               <div key={i} className="flex items-center justify-between rounded-lg bg-surface-container-low p-3">
                 <span className="text-sm text-on-surface truncate flex-1">{item.filename}</span>
-                <span className={`text-sm font-bold ml-2 ${item.score >= 7 ? "text-emerald-400" : item.score >= 5 ? "text-yellow-400" : "text-error"}`}>
+                <span className={`text-sm font-bold ml-2 ${item.score >= 7 ? "text-success" : item.score >= 5 ? "text-warning" : "text-error"}`}>
                   {item.score}/10
                 </span>
               </div>

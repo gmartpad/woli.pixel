@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../db";
 import { batchJobs, imageUploads, imageTypes } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { validateFile, extractMetadata } from "../services/upload-validator";
 import { analyzeImage, generateExplanation } from "../services/ai";
 import { processImage } from "../services/image-processor";
@@ -115,7 +115,7 @@ batchesRouter.post("/:batchId/analyze", async (c) => {
     const [batch] = await db.select().from(batchJobs).where(eq(batchJobs.id, batchId));
     if (!batch) return c.json({ error: "Lote não encontrado" }, 404);
 
-    const uploads = await db.select().from(imageUploads).where(eq(imageUploads.batchId, batchId));
+    const uploads = await db.select().from(imageUploads).where(eq(imageUploads.batchId, batchId)).orderBy(asc(imageUploads.batchIndex));
     if (uploads.length === 0) return c.json({ error: "Nenhuma imagem no lote" }, 400);
 
     if (batch.status === "analyzing") return c.json({ error: "Análise já em andamento" }, 409);
@@ -191,11 +191,12 @@ batchesRouter.post("/:batchId/process", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const defaultTypeId: string | undefined = body.default_type_id;
     const overrides: Record<string, string> = body.overrides || {};
+    const crops: Record<string, { x: number; y: number; width: number; height: number }> = body.crops || {};
 
     const [batch] = await db.select().from(batchJobs).where(eq(batchJobs.id, batchId));
     if (!batch) return c.json({ error: "Lote não encontrado" }, 404);
 
-    const uploads = await db.select().from(imageUploads).where(eq(imageUploads.batchId, batchId));
+    const uploads = await db.select().from(imageUploads).where(eq(imageUploads.batchId, batchId)).orderBy(asc(imageUploads.batchIndex));
     const analyzedUploads = uploads.filter(u => u.status === "analyzed");
     if (analyzedUploads.length === 0) return c.json({ error: "Nenhuma imagem analisada para processar" }, 400);
 
@@ -204,7 +205,7 @@ batchesRouter.post("/:batchId/process", async (c) => {
     const allTypes = await db.select().from(imageTypes);
 
     const tasks = analyzedUploads.map((upload) => async () => {
-      const targetTypeId = overrides[upload.id] || upload.aiSuggestedTypeId || defaultTypeId;
+      const targetTypeId = overrides[upload.id] || defaultTypeId || upload.aiSuggestedTypeId;
       if (!targetTypeId) throw new Error("Nenhum tipo alvo definido");
 
       const targetType = allTypes.find(t => t.id === targetTypeId);
@@ -218,7 +219,8 @@ batchesRouter.post("/:batchId/process", async (c) => {
 
       // Get image from S3 and process in memory
       const imageBuffer = await getImageBuffer(upload.originalS3Key!);
-      const processResult = await processImage(imageBuffer, targetType);
+      const imageCrop = crops[upload.id] || undefined;
+      const processResult = await processImage(imageBuffer, targetType, imageCrop);
 
       // Store processed result in S3
       const processedS3Key = await storeProcessed(upload.id, processResult.processedBuffer, processResult.processedFormat);
@@ -282,7 +284,7 @@ batchesRouter.get("/:batchId", async (c) => {
   const [batch] = await db.select().from(batchJobs).where(eq(batchJobs.id, batchId));
   if (!batch) return c.json({ error: "Lote não encontrado" }, 404);
 
-  const uploads = await db.select().from(imageUploads).where(eq(imageUploads.batchId, batchId));
+  const uploads = await db.select().from(imageUploads).where(eq(imageUploads.batchId, batchId)).orderBy(asc(imageUploads.batchIndex));
 
   return c.json({
     ...batch,

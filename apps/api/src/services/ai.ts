@@ -263,6 +263,39 @@ const moderationAnalysisSchema = {
   additionalProperties: false,
 };
 
+/**
+ * Translates a prompt to English for better image generation performance.
+ * Fail-open: returns original text on any error.
+ * Uses gpt-4.1-nano for speed and cost efficiency.
+ */
+export async function translatePromptToEnglish(prompt: string): Promise<string> {
+  // Quick heuristic: skip if prompt looks already English (only ASCII + common punctuation)
+  const looksEnglish = /^[\x20-\x7E\n\r\t]+$/.test(prompt);
+  if (looksEnglish) return prompt;
+
+  try {
+    const response = await openai.responses.create({
+      model: "gpt-4.1-nano",
+      input: [
+        {
+          role: "system",
+          content: "You are a translator. Translate the user's text to English. Return ONLY the translated text, nothing else. Preserve the meaning and intent exactly.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    });
+
+    const translated = response.output_text.trim();
+    return translated || prompt;
+  } catch {
+    // Fail-open: image models handle non-English, just not as well
+    return prompt;
+  }
+}
+
 export async function analyzeModeration(prompt: string): Promise<ModerationAnalysis> {
   const response = await openai.responses.create({
     model: "gpt-4.1-nano",

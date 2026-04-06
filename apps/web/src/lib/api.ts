@@ -158,12 +158,17 @@ export async function analyzeBatch(batchId: string) {
 export async function processBatch(
   batchId: string,
   defaultTypeId?: string,
-  overrides?: Record<string, string>
+  overrides?: Record<string, string>,
+  crops?: Record<string, { x: number; y: number; width: number; height: number }>
 ) {
   const res = await apiFetch(`${API_URL}/batches/${batchId}/process`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ default_type_id: defaultTypeId, overrides }),
+    body: JSON.stringify({
+      default_type_id: defaultTypeId,
+      overrides,
+      ...(crops && Object.keys(crops).length > 0 ? { crops } : {}),
+    }),
   });
   if (!res.ok) {
     const err = await res.json();
@@ -450,4 +455,286 @@ export async function getGateHistory(gateId: string, verdict?: string, page?: nu
   const res = await apiFetch(`${API_URL}/quality-gates/${gateId}/history?${params}`);
   if (!res.ok) throw new Error("Erro ao carregar histórico");
   return res.json();
+}
+
+// ── Custom Presets Endpoints ────────────────
+
+export type CustomPreset = {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  style: string;
+  outputFormat: string;
+  maxFileSizeKb: number;
+  requiresTransparency: boolean;
+  promptContext: string | null;
+  createdAt: string;
+};
+
+export async function fetchCustomPresets(): Promise<CustomPreset[]> {
+  const res = await apiFetch(`${API_URL}/custom-presets`);
+  if (!res.ok) throw new Error("Erro ao carregar presets personalizados");
+  const body = await res.json();
+  return body.data;
+}
+
+export async function createCustomPreset(data: {
+  name: string;
+  width: number;
+  height: number;
+  style?: string;
+  output_format?: string;
+  max_file_size_kb?: number;
+  requires_transparency?: boolean;
+  prompt_context?: string;
+}): Promise<CustomPreset> {
+  const res = await apiFetch(`${API_URL}/custom-presets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Erro ao criar preset");
+  }
+  const body = await res.json();
+  return body.data;
+}
+
+export async function updateCustomPreset(id: string, data: Record<string, any>): Promise<CustomPreset> {
+  const res = await apiFetch(`${API_URL}/custom-presets/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Erro ao atualizar preset");
+  }
+  const body = await res.json();
+  return body.data;
+}
+
+export async function deleteCustomPreset(id: string): Promise<void> {
+  const res = await apiFetch(`${API_URL}/custom-presets/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Erro ao excluir preset");
+}
+
+export async function getCustomResolutionCostEstimate(
+  width: number,
+  height: number,
+  style = "auto",
+  transparency = false,
+) {
+  const params = new URLSearchParams({
+    width: String(width),
+    height: String(height),
+    style,
+    transparency: String(transparency),
+  });
+  const res = await apiFetch(`${API_URL}/generate/cost/custom?${params}`);
+  if (!res.ok) throw new Error("Erro ao estimar custo personalizado");
+  return res.json();
+}
+
+export async function generateImageCustom(
+  width: number,
+  height: number,
+  prompt: string,
+  qualityTier: "low" | "medium" | "high" = "medium",
+  style = "auto",
+) {
+  const res = await apiFetch(`${API_URL}/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      custom_width: width,
+      custom_height: height,
+      prompt,
+      quality_tier: qualityTier,
+      custom_style: style,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    if (res.status === 422 && err.moderation) {
+      throw new ModerationRejectedError(err);
+    }
+    throw new Error(err.error || "Erro na geração");
+  }
+  return res.json();
+}
+
+export async function generateImageFromPreset(
+  customPresetId: string,
+  prompt: string,
+  qualityTier: "low" | "medium" | "high" = "medium",
+) {
+  const res = await apiFetch(`${API_URL}/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      custom_preset_id: customPresetId,
+      prompt,
+      quality_tier: qualityTier,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    if (res.status === 422 && err.moderation) {
+      throw new ModerationRejectedError(err);
+    }
+    throw new Error(err.error || "Erro na geração");
+  }
+  return res.json();
+}
+
+// ── History Endpoints ────────────────────────
+
+export type HistoryItem = {
+  id: string;
+  mode: "generation" | "upload" | "crop";
+  status: string;
+  createdAt: string;
+  thumbnailUrl: string;
+  downloadUrl: string;
+  category: string | null;
+  imageTypeName: string | null;
+  displayName: string | null;
+  finalWidth: number | null;
+  finalHeight: number | null;
+  finalFormat: string | null;
+  finalSizeKb: number | null;
+  prompt: string | null;
+  enhancedPrompt: string | null;
+  model: string | null;
+  qualityTier: string | null;
+  costUsd: number | null;
+  originalFilename: string | null;
+  originalWidth: number | null;
+  originalHeight: number | null;
+  originalSizeKb: number | null;
+  aiQualityScore: number | null;
+};
+
+export type HistoryResponse = {
+  items: HistoryItem[];
+  total: number;
+  page: number;
+  perPage: number;
+  hasMore: boolean;
+};
+
+export type HistoryFilterParams = {
+  page?: number;
+  perPage?: number;
+  mode?: string;
+  status?: string;
+  category?: string;
+  model?: string;
+  quality?: string;
+  search?: string;
+  datePreset?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export async function fetchHistory(filters: HistoryFilterParams): Promise<HistoryResponse> {
+  const params = new URLSearchParams();
+  params.set("page", String(filters.page || 1));
+  params.set("per_page", String(filters.perPage || 24));
+  if (filters.mode && filters.mode !== "all") params.set("mode", filters.mode);
+  if (filters.status && filters.status !== "all") params.set("status", filters.status);
+  if (filters.category) params.set("category", filters.category);
+  if (filters.model) params.set("model", filters.model);
+  if (filters.quality) params.set("quality", filters.quality);
+  if (filters.search) params.set("search", filters.search);
+  if (filters.datePreset && filters.datePreset !== "all") params.set("date_preset", filters.datePreset);
+  if (filters.dateFrom) params.set("date_from", filters.dateFrom);
+  if (filters.dateTo) params.set("date_to", filters.dateTo);
+
+  const res = await apiFetch(`${API_URL}/history?${params}`);
+  if (!res.ok) throw new Error("Erro ao carregar histórico");
+  return res.json();
+}
+
+export async function deleteHistoryItem(id: string, mode: string): Promise<void> {
+  const res = await apiFetch(`${API_URL}/history/${id}?mode=${mode}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Erro ao excluir item");
+}
+
+export async function bulkDeleteHistory(
+  items: { id: string; mode: string }[],
+): Promise<void> {
+  const res = await apiFetch(`${API_URL}/history/bulk`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+  if (!res.ok) throw new Error("Erro ao excluir itens");
+}
+
+export async function renameHistoryItem(
+  id: string,
+  mode: string,
+  displayName: string | null,
+): Promise<{ displayName: string | null }> {
+  const res = await apiFetch(`${API_URL}/history/${id}/rename`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode, displayName }),
+  });
+  if (!res.ok) throw new Error((await res.json()).error || "Erro ao renomear");
+  return res.json();
+}
+
+// ── Crop Endpoints ─────────────────────────────
+
+export async function saveCroppedImage(
+  original: File,
+  cropped: File,
+  cropArea: { x: number; y: number; width: number; height: number },
+): Promise<{ id: string; download_url: string }> {
+  const formData = new FormData();
+  formData.append("original", original);
+  formData.append("cropped", cropped);
+  formData.append("crop_x", String(Math.round(cropArea.x)));
+  formData.append("crop_y", String(Math.round(cropArea.y)));
+  formData.append("crop_w", String(Math.round(cropArea.width)));
+  formData.append("crop_h", String(Math.round(cropArea.height)));
+
+  const res = await apiFetch(`${API_URL}/crop`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Erro ao salvar recorte");
+  }
+
+  return res.json();
+}
+
+export async function downloadBatchZip(images: { id: string; format?: string }[]): Promise<Blob> {
+  const res = await apiFetch(`${API_URL}/images/download-zip`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ images }),
+  });
+  if (!res.ok) throw new Error("Erro ao baixar imagens");
+  return res.blob();
+}
+
+export async function bulkDownloadHistory(ids: string[]): Promise<Blob> {
+  const res = await apiFetch(`${API_URL}/history/download`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+  if (!res.ok) throw new Error("Erro ao baixar imagens");
+  return res.blob();
 }

@@ -26,9 +26,9 @@ export function GateTestPanel() {
   };
 
   const verdictStyles = {
-    pass: { bg: "bg-emerald-500/20", text: "text-emerald-400", label: "APROVADO" },
-    fail: { bg: "bg-error/20", text: "text-error", label: "REPROVADO" },
-    warn: { bg: "bg-yellow-500/20", text: "text-yellow-400", label: "ALERTA" },
+    pass: { bg: "bg-success-container", text: "text-success", label: "APROVADO" },
+    fail: { bg: "bg-error-container", text: "text-error", label: "REPROVADO" },
+    warn: { bg: "bg-warning-container", text: "text-warning", label: "ALERTA" },
   };
 
   return (
@@ -71,10 +71,10 @@ export function GateTestPanel() {
 
           {result.warnings.length > 0 && (
             <div className="space-y-1">
-              <div className="text-xs uppercase tracking-wider text-yellow-400">Alertas</div>
+              <div className="text-xs uppercase tracking-wider text-warning">Alertas</div>
               {result.warnings.map((w, i) => (
                 <div key={i} className="flex items-start gap-2 text-xs text-on-surface-variant">
-                  <svg className="h-3.5 w-3.5 text-yellow-400 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
+                  <svg className="h-3.5 w-3.5 text-warning mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
                   {w}
                 </div>
               ))}
@@ -82,7 +82,7 @@ export function GateTestPanel() {
           )}
 
           {result.failures.length === 0 && result.warnings.length === 0 && (
-            <p className="text-xs text-emerald-400">Todos os critérios atendidos.</p>
+            <p className="text-xs text-success">Todos os critérios atendidos.</p>
           )}
         </div>
       )}

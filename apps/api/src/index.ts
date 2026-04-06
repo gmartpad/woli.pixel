@@ -13,6 +13,9 @@ import { generationCostRouter } from "./routes/generation-cost";
 import { generateRouter } from "./routes/generate";
 import { profileRouter } from "./routes/profile";
 import { avatarRouter } from "./routes/avatar";
+import { customPresetsRouter } from "./routes/custom-presets";
+import { historyRouter } from "./routes/history";
+import { cropRouter } from "./routes/crop";
 
 const app = new Hono();
 
@@ -53,6 +56,9 @@ app.use("/api/v1/audits/*", requireAuth);
 app.use("/api/v1/quality-gates/*", requireAuth);
 app.use("/api/v1/generate/*", requireAuth);
 app.use("/api/v1/profile/*", requireAuth);
+app.use("/api/v1/custom-presets/*", requireAuth);
+app.use("/api/v1/history/*", requireAuth);
+app.use("/api/v1/crop/*", requireAuth);
 
 app.route("/api/v1/images", imagesRouter);
 app.route("/api/v1/batches", batchesRouter);
@@ -62,6 +68,9 @@ app.route("/api/v1/quality-gates", qualityGatesRouter);
 app.route("/api/v1/generate", generateRouter);
 app.route("/api/v1/profile", profileRouter);
 app.route("/api/v1/avatar", avatarRouter);
+app.route("/api/v1/custom-presets", customPresetsRouter);
+app.route("/api/v1/history", historyRouter);
+app.route("/api/v1/crop", cropRouter);
 
 // 404 handler
 app.notFound((c) => {

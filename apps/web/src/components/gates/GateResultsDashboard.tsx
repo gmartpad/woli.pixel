@@ -23,16 +23,16 @@ export function GateResultsDashboard() {
       <h3 className="text-lg font-semibold text-on-surface font-headline">Histórico de Validações</h3>
 
       <div className="grid grid-cols-4 gap-3">
-        <div className="rounded-lg bg-emerald-500/10 p-2 text-center">
-          <div className="text-lg font-bold text-emerald-400">{passCount}</div>
+        <div className="rounded-lg bg-success-container p-2 text-center">
+          <div className="text-lg font-bold text-success">{passCount}</div>
           <div className="text-[10px] text-on-surface-variant">Pass</div>
         </div>
         <div className="rounded-lg bg-error/10 p-2 text-center">
           <div className="text-lg font-bold text-error">{failCount}</div>
           <div className="text-[10px] text-on-surface-variant">Fail</div>
         </div>
-        <div className="rounded-lg bg-yellow-500/10 p-2 text-center">
-          <div className="text-lg font-bold text-yellow-400">{warnCount}</div>
+        <div className="rounded-lg bg-warning-container p-2 text-center">
+          <div className="text-lg font-bold text-warning">{warnCount}</div>
           <div className="text-[10px] text-on-surface-variant">Warn</div>
         </div>
         <div className="rounded-lg bg-primary/10 p-2 text-center">
@@ -68,9 +68,9 @@ export function GateResultsDashboard() {
                   <td className="py-1.5 font-medium text-on-surface">{r.qualityScore}</td>
                   <td className="py-1.5">
                     <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                      r.verdict === "pass" ? "bg-emerald-500/20 text-emerald-400"
-                      : r.verdict === "fail" ? "bg-error/20 text-error"
-                      : "bg-yellow-500/20 text-yellow-400"
+                      r.verdict === "pass" ? "bg-success-container text-success"
+                      : r.verdict === "fail" ? "bg-error-container text-error"
+                      : "bg-warning-container text-warning"
                     }`}>
                       {r.verdict}
                     </span>

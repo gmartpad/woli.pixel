@@ -1,11 +1,14 @@
 import { Hono } from "hono";
 import { db } from "../db";
 import { imageUploads, imageTypes } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { analyzeImage, generateExplanation } from "../services/ai";
 import { processImage } from "../services/image-processor";
 import { storeOriginal, storeProcessed, getImageBuffer, getDownloadUrl } from "../services/storage";
 import sharp from "sharp";
+import archiver from "archiver";
+import { Readable } from "node:stream";
+import { deduplicateZipFilename } from "../lib/zip-filename";
 
 const imagesRouter = new Hono();
 
@@ -318,6 +321,106 @@ imagesRouter.get("/:id/download", async (c) => {
       "Content-Disposition": `attachment; filename="${downloadName}"`,
     },
   });
+});
+
+// POST /api/v1/images/download-zip — Download multiple processed images as ZIP
+imagesRouter.post("/download-zip", async (c) => {
+  try {
+    let body: { images: { id: string; format?: string }[] };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Body JSON inválido" }, 400);
+    }
+
+    if (!body.images || !Array.isArray(body.images) || body.images.length === 0) {
+      return c.json({ error: "Nenhuma imagem selecionada" }, 400);
+    }
+
+    const ids = body.images.map((img) => img.id);
+    const formatMap = new Map(body.images.map((img) => [img.id, img.format]));
+
+    // Query all uploads at once
+    const uploads = await db
+      .select({
+        id: imageUploads.id,
+        originalFilename: imageUploads.originalFilename,
+        processedS3Key: imageUploads.processedS3Key,
+        processedFormat: imageUploads.processedFormat,
+        processedWidth: imageUploads.processedWidth,
+        processedHeight: imageUploads.processedHeight,
+        targetImageTypeId: imageUploads.targetImageTypeId,
+      })
+      .from(imageUploads)
+      .where(inArray(imageUploads.id, ids));
+
+    const processedUploads = uploads.filter((u) => u.processedS3Key);
+    if (processedUploads.length === 0) {
+      return c.json({ error: "Nenhuma imagem processada encontrada" }, 404);
+    }
+
+    // Collect unique type IDs, query imageTypes for display names
+    const typeIds = [...new Set(processedUploads.map((u) => u.targetImageTypeId).filter(Boolean))] as string[];
+    const typeMap = new Map<string, string>();
+    if (typeIds.length > 0) {
+      const types = await db
+        .select({ id: imageTypes.id, displayName: imageTypes.displayName })
+        .from(imageTypes)
+        .where(inArray(imageTypes.id, typeIds));
+      for (const t of types) typeMap.set(t.id, t.displayName);
+    }
+
+    // Create ZIP archive
+    const archive = archiver("zip", { zlib: { level: 5 } });
+    const usedNames = new Set<string>();
+
+    for (const upload of processedUploads) {
+      const buffer = await getImageBuffer(upload.processedS3Key!);
+      const storedFormat = upload.processedFormat || "jpeg";
+      const requestedFormat = formatMap.get(upload.id);
+      const normalizedRequested = requestedFormat === "jpg" ? "jpeg" : requestedFormat;
+
+      let finalBuffer: Buffer;
+      let ext: string;
+
+      if (normalizedRequested && normalizedRequested !== storedFormat) {
+        // Convert format with Sharp (same logic as single download)
+        const converted = sharp(Buffer.from(buffer));
+        if (normalizedRequested === "png") converted.png();
+        else if (normalizedRequested === "jpeg") converted.jpeg({ quality: 85, mozjpeg: true });
+        else if (normalizedRequested === "webp") converted.webp({ quality: 85 });
+        finalBuffer = await converted.toBuffer();
+        ext = normalizedRequested === "jpeg" ? "jpg" : normalizedRequested;
+      } else {
+        finalBuffer = Buffer.from(buffer);
+        ext = storedFormat === "jpeg" ? "jpg" : storedFormat;
+      }
+
+      const baseName = upload.originalFilename.replace(/\.[^.]+$/, "");
+      const typeName = upload.targetImageTypeId ? typeMap.get(upload.targetImageTypeId) : null;
+      const typePart = typeName ? `_${typeName.replace(/\s+/g, "-")}` : "";
+      const resPart = upload.processedWidth && upload.processedHeight
+        ? `_${upload.processedWidth}x${upload.processedHeight}` : "";
+      const rawFilename = `${baseName}${typePart}${resPart}.${ext}`;
+      const filename = deduplicateZipFilename(rawFilename, usedNames);
+      archive.append(finalBuffer, { name: filename });
+    }
+
+    archive.finalize();
+
+    const webStream = Readable.toWeb(archive) as ReadableStream;
+
+    return new Response(webStream, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": 'attachment; filename="woli-pixel-images.zip"',
+      },
+    });
+  } catch (err) {
+    console.error("Download ZIP error:", err);
+    return c.json({ error: "Erro ao gerar arquivo ZIP" }, 500);
+  }
 });
 
 export { imagesRouter };

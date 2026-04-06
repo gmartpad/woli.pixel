@@ -18,58 +18,63 @@ profileRouter.get("/avatar/history", async (c) => {
     return c.json({ error: "Autenticação necessária" }, 401);
   }
 
-  let rows = await db
-    .select()
-    .from(avatarHistory)
-    .where(eq(avatarHistory.userId, user.id))
-    .orderBy(desc(avatarHistory.uploadedAt));
+  try {
+    let rows = await db
+      .select()
+      .from(avatarHistory)
+      .where(eq(avatarHistory.userId, user.id))
+      .orderBy(desc(avatarHistory.uploadedAt));
 
-  // Lazy backfill: if user has a presigned URL but no history rows
-  if (rows.length === 0 && user.image && user.image.includes("X-Amz-Signature")) {
-    try {
-      // Parse S3 key from the presigned URL
-      const url = new URL(user.image);
-      const pathParts = url.pathname.split("/");
-      const avatarsIdx = pathParts.indexOf("avatars");
-      if (avatarsIdx !== -1) {
-        const s3Key = pathParts.slice(avatarsIdx).join("/");
-        const exists = await objectExists(s3Key);
+    // Lazy backfill: if user has a presigned URL but no history rows
+    if (rows.length === 0 && user.image && user.image.includes("X-Amz-Signature")) {
+      try {
+        // Parse S3 key from the presigned URL
+        const url = new URL(user.image);
+        const pathParts = url.pathname.split("/");
+        const avatarsIdx = pathParts.indexOf("avatars");
+        if (avatarsIdx !== -1) {
+          const s3Key = pathParts.slice(avatarsIdx).join("/");
+          const exists = await objectExists(s3Key);
 
-        if (exists) {
-          const [inserted] = await db
-            .insert(avatarHistory)
-            .values({
-              userId: user.id,
-              s3Key,
-              fileSize: 0, // Unknown for legacy avatars
-              width: 256,
-              height: 256,
-            })
-            .returning();
+          if (exists) {
+            const [inserted] = await db
+              .insert(avatarHistory)
+              .values({
+                userId: user.id,
+                s3Key,
+                fileSize: 0, // Unknown for legacy avatars
+                width: 256,
+                height: 256,
+              })
+              .returning();
 
-          // Update user.image to proxy URL
-          await auth.api.updateUser({
-            body: { image: `/api/v1/avatar/${inserted.id}` },
-            headers: c.req.raw.headers,
-          });
+            // Update user.image to proxy URL
+            await auth.api.updateUser({
+              body: { image: `/api/v1/avatar/${inserted.id}` },
+              headers: c.req.raw.headers,
+            });
 
-          rows = [inserted];
+            rows = [inserted];
+          }
         }
+      } catch (err) {
+        console.error("Avatar backfill failed:", err);
+        // Non-fatal -- continue with empty history
       }
-    } catch (err) {
-      console.error("Avatar backfill failed:", err);
-      // Non-fatal -- continue with empty history
     }
+
+    const data = rows.map((row) => ({
+      id: row.id,
+      url: `/api/v1/avatar/${row.id}`,
+      uploadedAt: row.uploadedAt,
+      fileSize: row.fileSize,
+    }));
+
+    return c.json({ data });
+  } catch (err) {
+    console.error("Avatar history fetch failed:", err);
+    return c.json({ error: "Erro ao carregar histórico de fotos" }, 500);
   }
-
-  const data = rows.map((row) => ({
-    id: row.id,
-    url: `/api/v1/avatar/${row.id}`,
-    uploadedAt: row.uploadedAt,
-    fileSize: row.fileSize,
-  }));
-
-  return c.json({ data });
 });
 
 profileRouter.post("/avatar", async (c) => {

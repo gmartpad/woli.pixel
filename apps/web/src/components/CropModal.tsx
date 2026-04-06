@@ -20,6 +20,24 @@ interface CropModalProps {
   typeName: string;
 }
 
+export function computeUpscaleStatus(
+  displayWidth: number,
+  displayHeight: number,
+  targetWidth: number | null,
+  targetHeight: number | null,
+): { needsUpscale: boolean; scalePercent: number } {
+  if (!targetWidth || !targetHeight || displayWidth === 0) {
+    return { needsUpscale: false, scalePercent: 0 };
+  }
+  const widthRatio = targetWidth / displayWidth;
+  const heightRatio = targetHeight / displayHeight;
+  const maxRatio = Math.max(widthRatio, heightRatio);
+  return {
+    needsUpscale: maxRatio > 1,
+    scalePercent: maxRatio > 1 ? Math.round((maxRatio - 1) * 100) : 0,
+  };
+}
+
 function computeRatioLabel(w: number, h: number): string {
   const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
   const d = gcd(w, h);
@@ -57,10 +75,7 @@ export function CropModal({
   const displayWidth = completedCrop ? Math.round((completedCrop.width / zoom) * scaleX) : 0;
   const displayHeight = completedCrop ? Math.round((completedCrop.height / zoom) * scaleY) : 0;
 
-  const isTooSmall =
-    displayWidth > 0 &&
-    hasFixedAspect &&
-    (displayWidth < targetWidth || displayHeight < targetHeight);
+  const { needsUpscale, scalePercent } = computeUpscaleStatus(displayWidth, displayHeight, targetWidth, targetHeight);
 
   // Focus management & body scroll lock
   useEffect(() => {
@@ -307,11 +322,16 @@ export function CropModal({
           {/* Dimensions indicator */}
           <div className="text-xs">
             {completedCrop ? (
-              <span className={isTooSmall ? "font-medium text-red-400" : "text-on-surface-variant"}>
-                {isTooSmall
-                  ? `Abaixo do mínimo (${targetWidth}×${targetHeight})`
-                  : `${displayWidth} × ${displayHeight} px`}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={needsUpscale ? "text-warning" : "text-on-surface-variant"}>
+                  {displayWidth} × {displayHeight} px
+                </span>
+                {needsUpscale && (
+                  <span className="rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+                    Será ampliada ~{scalePercent}%
+                  </span>
+                )}
+              </div>
             ) : (
               <span className="text-on-surface-variant/40">&nbsp;</span>
             )}
@@ -336,7 +356,7 @@ export function CropModal({
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={isTooSmall || !completedCrop}
+              disabled={!completedCrop}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary transition-colors hover:brightness-110 disabled:opacity-50"
             >
               Aplicar e Processar

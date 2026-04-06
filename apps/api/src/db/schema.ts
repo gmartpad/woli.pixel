@@ -2,7 +2,7 @@
 export { user, session, account, verification } from "./auth-schema";
 
 import { relations } from "drizzle-orm";
-import { pgTable, uuid, varchar, integer, text, boolean, timestamp, jsonb, index, numeric } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, integer, text, boolean, timestamp, jsonb, index, numeric, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
 // ── Image Types ──────────────────────────────
@@ -25,6 +25,32 @@ export const imageTypes = pgTable("image_types", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
+
+// ── Custom Presets (User-Created) ────────────
+export const customPresets = pgTable("custom_presets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+  style: varchar("style", { length: 20 }).notNull().default("auto"),
+  outputFormat: varchar("output_format", { length: 10 }).notNull().default("png"),
+  maxFileSizeKb: integer("max_file_size_kb").notNull().default(500),
+  requiresTransparency: boolean("requires_transparency").notNull().default(false),
+  promptContext: text("prompt_context"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_custom_presets_user").on(table.userId),
+  uniqueIndex("uq_custom_presets_user_name").on(table.userId, table.name),
+]);
+
+export const customPresetsRelations = relations(customPresets, ({ one }) => ({
+  user: one(user, {
+    fields: [customPresets.userId],
+    references: [user.id],
+  }),
+}));
 
 // ── Batch Jobs (Feature 1) ───────────────────
 export const batchJobs = pgTable("batch_jobs", {
@@ -89,6 +115,7 @@ export const imageUploads = pgTable("image_uploads", {
   brandProfileId: uuid("brand_profile_id").references(() => brandProfiles.id),
   brandScore: integer("brand_score"),
   brandIssues: text("brand_issues").array(),
+  displayName: varchar("display_name", { length: 255 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 }, (table) => [
@@ -188,7 +215,8 @@ export const qualityGateConfigs = pgTable("quality_gate_configs", {
 // ── Generation Jobs (Feature 6) ──────────────
 export const generationJobs = pgTable("generation_jobs", {
   id: uuid("id").primaryKey().defaultRandom(),
-  imageTypeId: uuid("image_type_id").references(() => imageTypes.id).notNull(),
+  imageTypeId: uuid("image_type_id").references(() => imageTypes.id),
+  customPresetId: uuid("custom_preset_id").references(() => customPresets.id),
   model: varchar("model", { length: 20 }).notNull(), // "recraft_v3" | "flux2_pro"
   prompt: text("prompt").notNull(),
   enhancedPrompt: text("enhanced_prompt"),
@@ -207,6 +235,7 @@ export const generationJobs = pgTable("generation_jobs", {
   costUsd: numeric("cost_usd", { precision: 6, scale: 4 }),
   providerRequestId: varchar("provider_request_id", { length: 200 }),
   errorMessage: text("error_message"),
+  displayName: varchar("display_name", { length: 255 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 }, (table) => [
@@ -233,4 +262,29 @@ export const gateResults = pgTable("gate_results", {
   index("idx_gate_results_verdict").on(table.verdict),
   index("idx_gate_results_config").on(table.gateConfigId),
   index("idx_gate_results_source").on(table.source, table.sourceReference),
+]);
+
+// ── Image Crops (Standalone Crop Tool) ──────
+export const imageCrops = pgTable("image_crops", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  originalFilename: varchar("original_filename", { length: 255 }).notNull(),
+  originalFormat: varchar("original_format", { length: 10 }).notNull(),
+  originalWidth: integer("original_width").notNull(),
+  originalHeight: integer("original_height").notNull(),
+  originalSizeKb: integer("original_size_kb").notNull(),
+  originalS3Key: text("original_s3_key"),
+  croppedWidth: integer("cropped_width").notNull(),
+  croppedHeight: integer("cropped_height").notNull(),
+  croppedFormat: varchar("cropped_format", { length: 10 }).notNull(),
+  croppedSizeKb: integer("cropped_size_kb").notNull(),
+  croppedS3Key: text("cropped_s3_key"),
+  cropX: integer("crop_x").notNull(),
+  cropY: integer("crop_y").notNull(),
+  cropW: integer("crop_w").notNull(),
+  cropH: integer("crop_h").notNull(),
+  status: varchar("status", { length: 20 }).default("completed").notNull(),
+  displayName: varchar("display_name", { length: 255 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_crops_created").on(table.createdAt),
 ]);

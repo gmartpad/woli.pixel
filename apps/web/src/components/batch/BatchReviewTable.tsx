@@ -58,7 +58,7 @@ export function BatchReviewTable() {
                   </div>
                 </td>
                 <td className="py-2 pr-3">
-                  <span className={`font-bold ${(img.qualityScore || 0) >= 7 ? "text-emerald-400" : (img.qualityScore || 0) >= 5 ? "text-yellow-400" : "text-error"}`}>
+                  <span className={`font-bold ${(img.qualityScore || 0) >= 7 ? "text-success" : (img.qualityScore || 0) >= 5 ? "text-warning" : "text-error"}`}>
                     {img.qualityScore}/10
                   </span>
                 </td>
@@ -79,7 +79,7 @@ export function BatchReviewTable() {
                 </td>
                 <td className="py-2">
                   <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                    img.status === "processed" ? "bg-emerald-500/20 text-emerald-400"
+                    img.status === "processed" ? "bg-success-container text-success"
                     : img.status === "error" ? "bg-error/20 text-error"
                     : "bg-surface-container-high text-on-surface-variant"
                   }`}>

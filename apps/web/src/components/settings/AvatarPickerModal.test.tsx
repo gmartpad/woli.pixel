@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -68,5 +68,45 @@ describe("AvatarPickerModal", () => {
   it("does not render when isOpen is false", () => {
     render(<AvatarPickerModal {...defaultProps} isOpen={false} />, { wrapper: createWrapper() });
     expect(screen.queryByText("Alterar foto de perfil")).not.toBeInTheDocument();
+  });
+
+  it("renders dropzone with instructional text on upload tab", async () => {
+    const user = userEvent.setup();
+    render(<AvatarPickerModal {...defaultProps} />, { wrapper: createWrapper() });
+    await user.click(screen.getByRole("tab", { name: /enviar nova/i }));
+    expect(screen.getByText("Arraste uma imagem aqui")).toBeInTheDocument();
+    expect(screen.getByText("ou clique para selecionar")).toBeInTheDocument();
+  });
+
+  it("dropzone has accessible role and aria-label", async () => {
+    const user = userEvent.setup();
+    render(<AvatarPickerModal {...defaultProps} />, { wrapper: createWrapper() });
+    await user.click(screen.getByRole("tab", { name: /enviar nova/i }));
+    const dropzone = screen.getByRole("button", {
+      name: /zona de upload/i,
+    });
+    expect(dropzone).toBeInTheDocument();
+    expect(dropzone).toHaveAttribute(
+      "aria-label",
+      "Zona de upload. Arraste uma imagem ou clique para selecionar",
+    );
+  });
+
+  it("shows cropper when a valid image is dropped on the dropzone", async () => {
+    const user = userEvent.setup();
+    render(<AvatarPickerModal {...defaultProps} />, { wrapper: createWrapper() });
+    await user.click(screen.getByRole("tab", { name: /enviar nova/i }));
+
+    const dropzone = screen.getByRole("button", { name: /zona de upload/i });
+    const file = new File(["pixels"], "avatar.png", { type: "image/png" });
+    const dataTransfer = {
+      files: [file],
+      types: ["Files"],
+    };
+
+    fireEvent.dragOver(dropzone, { dataTransfer });
+    fireEvent.drop(dropzone, { dataTransfer });
+
+    expect(screen.getByTestId("mock-cropper")).toBeInTheDocument();
   });
 });

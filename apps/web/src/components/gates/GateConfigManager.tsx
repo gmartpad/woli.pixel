@@ -129,7 +129,7 @@ export function GateConfigManager() {
             <label className="text-xs text-on-surface-variant block mb-1">Tipos permitidos</label>
             <div className="flex flex-wrap gap-1">
               {contentTypes.map((t) => (
-                <button key={t} onClick={() => toggleType("allowed_content_types", t)} className={`rounded-full px-2 py-0.5 text-xs ${form.allowed_content_types.includes(t) ? "bg-emerald-500/20 text-emerald-400" : "bg-surface-container-high text-on-surface-variant"}`}>
+                <button key={t} onClick={() => toggleType("allowed_content_types", t)} className={`rounded-full px-2 py-0.5 text-xs ${form.allowed_content_types.includes(t) ? "bg-success-container text-success" : "bg-surface-container-high text-on-surface-variant"}`}>
                   {t}
                 </button>
               ))}
@@ -149,7 +149,7 @@ export function GateConfigManager() {
             <div className="flex items-center justify-between">
               <div>
                 <span className="font-medium text-on-surface">{c.name}</span>
-                <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full font-medium ${c.isActive ? "bg-emerald-500/20 text-emerald-400" : "bg-surface-container-high text-outline"}`}>
+                <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full font-medium ${c.isActive ? "bg-success-container text-success" : "bg-surface-container-high text-outline"}`}>
                   {c.isActive ? "Ativo" : "Inativo"}
                 </span>
               </div>

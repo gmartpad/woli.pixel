@@ -38,6 +38,7 @@ export function AvatarPickerModal({
   const [activeTab, setActiveTab] = useState<Tab>("history");
   const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Upload tab state
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -96,20 +97,44 @@ export function AvatarPickerModal({
       queryClient.invalidateQueries({ queryKey: ["avatar-history"] });
       toast.success("Foto de perfil atualizada!");
       setImageSrc(null);
-      setActiveTab("history");
+      onClose();
     },
     onError: (err: Error) => toast.error(err.message),
   });
 
   if (!isOpen) return null;
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  function handleFile(file: File) {
     setImageSrc(URL.createObjectURL(file));
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setCroppedAreaPixels(null);
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Formato não suportado", { description: "Envie uma imagem" });
+      return;
+    }
+    handleFile(file);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(true);
+  }
+
+  function handleDragLeave() {
+    setIsDragOver(false);
   }
 
   function handleCropComplete(_: unknown, pixels: CroppedArea) {
@@ -229,14 +254,35 @@ export function AvatarPickerModal({
               className="hidden"
             />
             {!imageSrc ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="rounded-lg bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:bg-primary/90 transition-colors"
-                >
-                  Escolher arquivo
-                </button>
+              <div
+                role="button"
+                tabIndex={0}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                aria-label="Zona de upload. Arraste uma imagem ou clique para selecionar"
+                className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-all duration-300 ${
+                  isDragOver
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-outline/50 text-on-surface-variant hover:border-primary/30 hover:text-on-surface"
+                }`}
+              >
+                <div className={`mb-3 rounded-2xl p-3 ${isDragOver ? "bg-primary/20" : "bg-surface-container-high/60"}`}>
+                  <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                  </svg>
+                </div>
+                <p className="mb-1 text-sm font-semibold">
+                  {isDragOver ? "Solte a imagem aqui" : "Arraste uma imagem aqui"}
+                </p>
+                <p className="text-xs text-outline">ou clique para selecionar</p>
               </div>
             ) : (
               <>

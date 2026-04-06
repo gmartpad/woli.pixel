@@ -26,7 +26,7 @@ export function AvatarThumbnail({
     <button
       type="button"
       className={cn(
-        "relative h-16 w-16 rounded-full overflow-hidden transition-all",
+        "relative h-16 w-16 rounded-full transition-all",
         "ring-2 ring-offset-2 ring-offset-surface-container-low",
         isSelected
           ? "ring-primary"
@@ -40,14 +40,14 @@ export function AvatarThumbnail({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <img src={url} alt={`Avatar ${id}`} className="h-full w-full object-cover" />
+      <img src={url} alt={`Avatar ${id}`} className="h-full w-full rounded-full object-cover" />
 
       {hovered && !isMultiSelect && (
         <span
           role="button"
           tabIndex={0}
           aria-label="Excluir avatar"
-          className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-error text-white text-xs shadow-md hover:bg-error/80"
+          className="absolute -top-1 -right-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white text-xs shadow-md backdrop-blur-sm hover:bg-error transition-colors"
           onClick={(e) => {
             e.stopPropagation();
             onDelete(id);
@@ -64,7 +64,7 @@ export function AvatarThumbnail({
       )}
 
       {isMultiSelect && (
-        <div className="absolute top-0.5 right-0.5">
+        <div className="absolute -top-1 -right-1 z-10">
           <input
             type="checkbox"
             checked={isSelected}

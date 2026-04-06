@@ -29,6 +29,27 @@
       "when": 1775380674790,
       "tag": "0003_shiny_living_tribunal",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1775390399383,
+      "tag": "0004_soft_paper_doll",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775560572723,
+      "tag": "0005_amazing_corsair",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775562044577,
+      "tag": "0006_lucky_pandemic",
+      "breakpoints": true
     }
   ]
 }

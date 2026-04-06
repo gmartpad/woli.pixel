@@ -1,6 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchPresetCost } from "@/lib/api";
-
 export type QualityTier = "low" | "medium" | "high";
 
 type QualityOption = {
@@ -18,27 +15,20 @@ const QUALITY_OPTIONS: QualityOption[] = [
 type Props = {
   selectedTier: QualityTier;
   onSelect: (tier: QualityTier) => void;
-  typeKey: string | null;
+  typeKey?: string | null;
+  costs?: Record<QualityTier, number>;
+  modelLabel?: string;
+  note?: string | null;
 };
 
-export function QualitySelector({ selectedTier, onSelect, typeKey }: Props) {
-  const { data: costData } = useQuery({
-    queryKey: ["preset-cost", typeKey],
-    queryFn: () => fetchPresetCost(typeKey!),
-    enabled: !!typeKey,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const costs = costData?.costs as Record<QualityTier, number> | undefined;
-  const note = costData?.notes as string | null | undefined;
-
+export function QualitySelector({ selectedTier, onSelect, costs, modelLabel, note }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-on-surface">Qualidade da Geração</h4>
-        {costs && (
+        {modelLabel && (
           <span className="text-xs text-outline">
-            gpt-image-1-mini
+            {modelLabel}
           </span>
         )}
       </div>

@@ -31,8 +31,8 @@ export function BatchSummary() {
           <div className="text-2xl font-bold text-on-surface">{images.length}</div>
           <div className="text-xs text-on-surface-variant">Total</div>
         </div>
-        <div className="rounded-lg bg-emerald-500/10 p-3 text-center">
-          <div className="text-2xl font-bold text-emerald-400">{passed}</div>
+        <div className="rounded-lg bg-success-container p-3 text-center">
+          <div className="text-2xl font-bold text-success">{passed}</div>
           <div className="text-xs text-on-surface-variant">Aprovadas</div>
         </div>
         <div className="rounded-lg bg-error/10 p-3 text-center">

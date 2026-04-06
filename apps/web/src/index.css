@@ -40,11 +40,19 @@
   --color-on-error: #490006;
   --color-on-error-container: #ffa8a3;
 
+  /* Success */
+  --color-success: #6dd58c;
+  --color-success-container: #1a3d2a;
+
+  /* Warning */
+  --color-warning: #e4b940;
+  --color-warning-container: #3d3000;
+
   /* Text / On-surface */
   --color-on-background: #dee5ff;
   --color-on-surface: #dee5ff;
   --color-on-surface-variant: #a3aac4;
-  --color-outline: #6d758c;
+  --color-outline: #7d849b;
   --color-outline-variant: #40485d;
 
   /* Fonts */
@@ -110,6 +118,12 @@ html.light {
   --color-error-container: #ffdad6;
   --color-on-error: #ffffff;
   --color-on-error-container: #410002;
+
+  --color-success: #1a7d36;
+  --color-success-container: #d4f5dc;
+
+  --color-warning: #6d5300;
+  --color-warning-container: #fff0c0;
 
   --color-on-background: #1a1c24;
   --color-on-surface: #1a1c24;

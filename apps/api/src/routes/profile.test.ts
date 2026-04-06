@@ -12,6 +12,7 @@ const mockBatchDeleteObjects = mock(async () => {});
 mock.module("../services/storage", () => ({
   storeAvatar: mockStoreAvatar,
   batchDeleteObjects: mockBatchDeleteObjects,
+  deleteFromS3: async () => {},
 }));
 
 mock.module("../lib/s3", () => ({

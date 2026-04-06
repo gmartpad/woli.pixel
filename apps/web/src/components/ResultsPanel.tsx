@@ -8,6 +8,7 @@ function formatSize(kb: number) {
 const ADJUSTMENT_LABELS: Record<string, { label: string; text: string }> = {
   resized: { label: "Redimensionado", text: "Resize" },
   smart_cropped: { label: "Cortado (Smart Crop)", text: "Crop" },
+  user_cropped: { label: "Recortado pelo Usuário", text: "User_Cropped" },
   format_converted: { label: "Formato Convertido", text: "Convert" },
   compressed: { label: "Comprimido", text: "Compress" },
 };
