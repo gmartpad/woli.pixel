@@ -41,12 +41,18 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
       if (!resend) return;
+      // Replace default callbackURL to redirect to frontend after verification
+      const verificationUrl = new URL(url);
+      verificationUrl.searchParams.set(
+        "callbackURL",
+        process.env.FRONTEND_URL || "http://localhost:5173"
+      );
       try {
         await resend.emails.send({
           from: fromEmail,
           to: user.email,
           subject: "Woli Pixel — Verificar e-mail",
-          html: `<p>Olá ${user.name},</p><p><a href="${url}">Clique aqui para verificar seu e-mail</a></p>`,
+          html: `<p>Olá ${user.name},</p><p><a href="${verificationUrl.toString()}">Clique aqui para verificar seu e-mail</a></p>`,
         });
       } catch (error) {
         console.error("[auth] Failed to send verification email:", error);
