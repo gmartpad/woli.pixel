@@ -28,7 +28,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   if (isPending) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-surface-container-low text-on-surface">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
@@ -36,52 +36,54 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   if (!session || !session.user.emailVerified) {
     return (
-      <div className="w-full">
-        {view === "login" && (
-          <LoginPage
-            onSwitch={() => setView("register")}
-            onSuccess={() => window.location.reload()}
-            onForgot={() => setView("forgot")}
-          />
-        )}
-        {view === "register" && (
-          <RegisterPage
-            onSwitch={() => setView("login")}
-            onSuccess={(email: string) => {
-              setVerificationEmail(email);
-              setView("verify-email");
-            }}
-          />
-        )}
-        {view === "forgot" && (
-          <ForgotPasswordPage
-            onBack={() => setView("login")}
-          />
-        )}
-        {view === "reset" && resetToken && (
-          <ResetPasswordPage
-            token={resetToken}
-            onBack={() => {
-              setResetToken(null);
-              setView("login");
-            }}
-          />
-        )}
-        {view === "verify-email" && verificationEmail && (
-          <div className="mx-auto w-full max-w-sm space-y-4 text-center">
-            <h2 className="text-xl font-bold text-on-surface font-headline">Verifique seu e-mail</h2>
-            <p className="text-sm text-on-surface-variant">
-              Enviamos um link de verificação para <strong className="text-on-surface">{verificationEmail}</strong>.
-              Clique no link para ativar sua conta.
-            </p>
-            <button
-              onClick={() => setView("login")}
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              Voltar ao login
-            </button>
-          </div>
-        )}
+      <div className="flex min-h-screen items-center justify-center bg-surface-container-low text-on-surface px-4">
+        <div className="w-full">
+          {view === "login" && (
+            <LoginPage
+              onSwitch={() => setView("register")}
+              onSuccess={() => window.location.reload()}
+              onForgot={() => setView("forgot")}
+            />
+          )}
+          {view === "register" && (
+            <RegisterPage
+              onSwitch={() => setView("login")}
+              onSuccess={(email: string) => {
+                setVerificationEmail(email);
+                setView("verify-email");
+              }}
+            />
+          )}
+          {view === "forgot" && (
+            <ForgotPasswordPage
+              onBack={() => setView("login")}
+            />
+          )}
+          {view === "reset" && resetToken && (
+            <ResetPasswordPage
+              token={resetToken}
+              onBack={() => {
+                setResetToken(null);
+                setView("login");
+              }}
+            />
+          )}
+          {view === "verify-email" && verificationEmail && (
+            <div className="mx-auto w-full max-w-sm space-y-4 text-center">
+              <h2 className="text-xl font-bold text-on-surface font-headline">Verifique seu e-mail</h2>
+              <p className="text-sm text-on-surface-variant">
+                Enviamos um link de verificação para <strong className="text-on-surface">{verificationEmail}</strong>.
+                Clique no link para ativar sua conta.
+              </p>
+              <button
+                onClick={() => setView("login")}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Voltar ao login
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
