@@ -28,12 +28,21 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return;
     }
 
-    // Handle email verification callback
-    if (params.get("verified") === "true") {
+    // Handle email verification callback (hash-based)
+    if (window.location.hash === "#verified") {
+      sessionStorage.removeItem("verify-email");
       toast.success("E-mail verificado com sucesso!", {
         description: "Sua conta está ativa.",
       });
       window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+
+    // Restore verify-email view after registration (survives re-renders/refreshes)
+    const pendingEmail = sessionStorage.getItem("verify-email");
+    if (pendingEmail) {
+      setVerificationEmail(pendingEmail);
+      setView("verify-email");
     }
   }, []);
 
@@ -60,6 +69,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
             <RegisterPage
               onSwitch={() => setView("login")}
               onSuccess={(email: string) => {
+                sessionStorage.setItem("verify-email", email);
                 setVerificationEmail(email);
                 setView("verify-email");
               }}
@@ -87,7 +97,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
                 Clique no link para ativar sua conta.
               </p>
               <button
-                onClick={() => setView("login")}
+                onClick={() => {
+                  sessionStorage.removeItem("verify-email");
+                  setView("login");
+                }}
                 className="text-sm font-medium text-primary hover:underline"
               >
                 Voltar ao login
