@@ -11,6 +11,8 @@ const resend = process.env.RESEND_API_KEY
 
 const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@woli.com.br";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
   trustedOrigins: [
@@ -85,11 +87,9 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    defaultCookieAttributes: {
-      sameSite: "none",
-      secure: true,
-      partitioned: true,
-    },
+    defaultCookieAttributes: isProduction
+      ? { sameSite: "none", secure: true, partitioned: true }
+      : { sameSite: "lax", secure: false },
   },
 });
 
