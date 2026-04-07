@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
 import { LoginPage } from "./LoginPage";
 import { RegisterPage } from "./RegisterPage";
@@ -17,11 +18,21 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // Handle password reset token
     const token = params.get("token");
     if (token && params.get("reset") === "true") {
       setResetToken(token);
       setView("reset");
-      // Clean the URL
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+
+    // Handle email verification callback
+    if (params.get("verified") === "true") {
+      toast.success("E-mail verificado com sucesso!", {
+        description: "Sua conta está ativa.",
+      });
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
