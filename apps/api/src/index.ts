@@ -23,7 +23,10 @@ const app = new Hono();
 app.use("*", logger());
 app.use("*", cors({
   origin: process.env.NODE_ENV === "production"
-    ? (process.env.CORS_ORIGIN || "*").split(",")
+    ? [
+        ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : []),
+        ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+      ]
     : ["http://localhost:5173", "http://localhost:3000"],
   credentials: true,
   allowHeaders: ["Content-Type", "Authorization"],
