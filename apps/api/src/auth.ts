@@ -48,9 +48,10 @@ export const auth = betterAuth({
       if (!resend) return;
       // Replace default callbackURL to redirect to frontend after verification
       const verificationUrl = new URL(url);
+      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
       verificationUrl.searchParams.set(
         "callbackURL",
-        process.env.FRONTEND_URL || "http://localhost:5173"
+        `${frontendUrl}?verified=true`
       );
       try {
         await resend.emails.send({

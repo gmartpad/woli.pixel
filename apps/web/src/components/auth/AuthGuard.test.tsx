@@ -2,6 +2,14 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const mockToastSuccess = vi.fn();
+
+vi.mock("sonner", () => ({
+  toast: {
+    success: (...args: unknown[]) => mockToastSuccess(...args),
+  },
+}));
+
 const mockUseSession = vi.fn();
 
 vi.mock("@/lib/auth-client", () => ({
@@ -37,9 +45,21 @@ vi.mock("./ResetPasswordPage", () => ({
 
 import { AuthGuard } from "./AuthGuard";
 
+const replaceStateSpy = vi.spyOn(window.history, "replaceState");
+
+function setSearchParams(params: string) {
+  Object.defineProperty(window, "location", {
+    value: { ...window.location, search: params, pathname: "/" },
+    writable: true,
+  });
+}
+
 describe("AuthGuard", () => {
   beforeEach(() => {
     mockUseSession.mockReset();
+    mockToastSuccess.mockReset();
+    replaceStateSpy.mockReset();
+    setSearchParams("");
   });
 
   it("shows spinner when session is pending", () => {
@@ -125,5 +145,50 @@ describe("AuthGuard", () => {
 
     expect(screen.getByTestId("login-page")).toBeInTheDocument();
     expect(screen.queryByText("Verifique seu e-mail")).not.toBeInTheDocument();
+  });
+
+  it("shows success toast when ?verified=true is in the URL", () => {
+    setSearchParams("?verified=true");
+    mockUseSession.mockReturnValue({ data: null, isPending: false });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    expect(mockToastSuccess).toHaveBeenCalledWith(
+      "E-mail verificado com sucesso!",
+      { description: "Sua conta está ativa." }
+    );
+  });
+
+  it("does NOT show toast on normal page load without ?verified param", () => {
+    mockUseSession.mockReturnValue({ data: null, isPending: false });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("cleans URL after detecting ?verified=true", () => {
+    setSearchParams("?verified=true");
+    mockUseSession.mockReturnValue({ data: null, isPending: false });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, "", "/");
+  });
+
+  it("shows toast on dashboard when user is authenticated and ?verified=true", () => {
+    setSearchParams("?verified=true");
+    mockUseSession.mockReturnValue({
+      data: { user: { emailVerified: true } },
+      isPending: false,
+    });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    expect(mockToastSuccess).toHaveBeenCalledWith(
+      "E-mail verificado com sucesso!",
+      { description: "Sua conta está ativa." }
+    );
+    expect(screen.getByText("App")).toBeInTheDocument();
   });
 });
