@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { useThemeStore } from "@/stores/theme-store";
-import { signOut } from "@/lib/auth-client";
+import { signOut, clearAuthToken } from "@/lib/auth-client";
 
 interface AvatarDropdownProps {
   session: {
@@ -106,7 +106,7 @@ export function AvatarDropdown({ session, onNavigateSettings }: AvatarDropdownPr
 
           {/* Sign out */}
           <button
-            onClick={() => signOut({ fetchOptions: { onSuccess: () => window.location.reload() } })}
+            onClick={() => signOut({ fetchOptions: { onSuccess: () => { clearAuthToken(); window.location.reload(); } } })}
             aria-label="Sair"
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-error hover:bg-error/10 transition-colors"
           >

@@ -1,8 +1,16 @@
+import { getAuthToken } from "./auth-client";
+
 const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 function apiFetch(url: string, options?: RequestInit): Promise<Response> {
+  const token = getAuthToken();
+  const headers = new Headers(options?.headers);
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
   return fetch(url, {
     ...options,
+    headers,
     credentials: "include",
   });
 }

@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { username } from "better-auth/plugins";
+import { username, bearer } from "better-auth/plugins";
 import { Resend } from "resend";
 import { db } from "./db";
 import * as schema from "./db/auth-schema";
@@ -77,6 +77,7 @@ export const auth = betterAuth({
   },
   plugins: [
     username(),
+    bearer(),
   ],
   session: {
     expiresIn: 60 * 60 * 24 * 7,
