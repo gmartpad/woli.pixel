@@ -51,7 +51,7 @@ export const auth = betterAuth({
       const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
       verificationUrl.searchParams.set(
         "callbackURL",
-        `${frontendUrl}?verified=true`
+        `${frontendUrl}/#verified`
       );
       try {
         await resend.emails.send({
