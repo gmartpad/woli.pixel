@@ -33,6 +33,14 @@ import { useSession } from "@/lib/auth-client";
 type AppMode = "single" | "brands" | "generate" | "history" | "crop";
 type HeaderPage = "dashboard" | "settings";
 
+function App() {
+  return (
+    <AuthGuard>
+      <AuthenticatedApp />
+    </AuthGuard>
+  );
+}
+
 const NAV_ITEMS: { id: AppMode; label: string; icon: React.ReactNode; dividerBefore?: boolean }[] = [
   {
     id: "single",
@@ -83,7 +91,7 @@ const NAV_ITEMS: { id: AppMode; label: string; icon: React.ReactNode; dividerBef
   // },
 ];
 
-function App() {
+function AuthenticatedApp() {
   const { step } = useAppStore();
   const { theme, toggleTheme } = useThemeStore();
   const queryClient = useQueryClient();
@@ -91,7 +99,9 @@ function App() {
   const [activeNav, setActiveNav] = useState<AppMode>("single");
   const [activePage, setActivePage] = useState<HeaderPage>("dashboard");
   // const gateSelectedConfigId = useGateStore((s) => s.selectedConfigId);
-  const { data: session, isPending: authPending } = useSession();
+  // session is guaranteed non-null here — AuthGuard only renders children
+  // when the user is authenticated with a verified email
+  const { data: session } = useSession();
 
   useEffect(() => {
     if (sidebarOpen && window.innerWidth < 1024) {
@@ -102,21 +112,7 @@ function App() {
     return () => { document.body.style.overflow = ""; };
   }, [sidebarOpen]);
 
-  if (authPending) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-container-low text-on-surface">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (!session) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-container-low text-on-surface px-4">
-        <AuthGuard><div /></AuthGuard>
-      </div>
-    );
-  }
+  if (!session) return null;
 
   return (
     <div className="flex min-h-screen text-on-surface">
@@ -253,15 +249,12 @@ function App() {
         {/* Content */}
         <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-8">
           {activePage === "settings" && (
-            <AuthGuard>
               <SettingsPage session={session} />
-            </AuthGuard>
           )}
 
           {activePage === "dashboard" && (
           <div className="mx-auto max-w-6xl space-y-6">
             <ErrorBanner />
-            <AuthGuard>
 
             {/* ── Single Image Mode ── */}
             {activeNav === "single" && <ProcessWizard />}
@@ -286,7 +279,6 @@ function App() {
                 }} />
               </div>
             )}
-            </AuthGuard>
           </div>
           )}
         </main>
