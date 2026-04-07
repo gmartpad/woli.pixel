@@ -13,7 +13,10 @@ const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@woli.com.br";
 
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
-  trustedOrigins: (process.env.TRUSTED_ORIGINS || "http://localhost:5173").split(","),
+  trustedOrigins: [
+    ...(process.env.TRUSTED_ORIGINS || "http://localhost:5173").split(","),
+    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+  ],
   secret: process.env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(db, {
     provider: "pg",
