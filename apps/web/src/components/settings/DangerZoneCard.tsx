@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { authClient } from "@/lib/auth-client";
+import { authClient, clearAuthToken } from "@/lib/auth-client";
 
 export function DangerZoneCard() {
   const [confirmation, setConfirmation] = useState("");
@@ -23,6 +23,7 @@ export function DangerZoneCard() {
         return;
       }
 
+      clearAuthToken();
       window.location.reload();
     } catch {
       setError("Erro ao excluir conta. Tente novamente.");
