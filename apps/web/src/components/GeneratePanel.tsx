@@ -452,7 +452,7 @@ export function GeneratePanel() {
           {/* Preview */}
           <div className="flex justify-center rounded-lg bg-surface-container-low p-4">
             <img
-              src={`${import.meta.env.VITE_API_URL || "/api/v1"}${result.image.download_url.replace("/api/v1", "")}`}
+              src={`${import.meta.env.VITE_API_URL || "/api/v1"}/generate/${result.id}/preview`}
               alt="Generated"
               className="max-h-96 rounded-lg object-contain"
             />
