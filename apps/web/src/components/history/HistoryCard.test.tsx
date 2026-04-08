@@ -4,6 +4,19 @@ import { describe, it, expect, vi } from "vitest";
 import { HistoryCard } from "./HistoryCard";
 import type { HistoryItem } from "@/lib/api";
 
+// Mock useAuthImage to return blob URL synchronously in tests
+vi.mock("@/hooks/useAuthImage", () => ({
+  useAuthImage: (url: string | null) => ({
+    src: url ? `blob:test/${url}` : null,
+    loading: false,
+  }),
+}));
+
+// Mock auth-download
+vi.mock("@/lib/auth-download", () => ({
+  downloadAuthFile: vi.fn(),
+}));
+
 function createMockItem(overrides: Partial<HistoryItem> = {}): HistoryItem {
   return {
     id: "item-1",
@@ -195,7 +208,8 @@ describe("HistoryCard", () => {
     expect(screen.queryByLabelText("Ações")).not.toBeInTheDocument();
   });
 
-  it("Download menu item has download attribute and href", async () => {
+  it("Download menu item triggers authenticated download", async () => {
+    const { downloadAuthFile } = await import("@/lib/auth-download");
     const user = userEvent.setup();
     const item = createMockItem();
     render(
@@ -208,9 +222,9 @@ describe("HistoryCard", () => {
     );
 
     await user.click(screen.getByLabelText("Ações"));
-    const downloadLink = screen.getByRole("menuitem", { name: /download/i });
-    expect(downloadLink).toHaveAttribute("download");
-    expect(downloadLink).toHaveAttribute("href");
+    const downloadBtn = screen.getByRole("menuitem", { name: /download/i });
+    await user.click(downloadBtn);
+    expect(downloadAuthFile).toHaveBeenCalled();
   });
 
   // ── Selection mode tests ─────────────────────

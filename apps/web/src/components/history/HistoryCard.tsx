@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAuthImage } from "@/hooks/useAuthImage";
+import { downloadAuthFile } from "@/lib/auth-download";
 import type { HistoryItem } from "@/lib/api";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
@@ -42,8 +44,9 @@ export function HistoryCard({
     .filter(Boolean)
     .join(" · ");
 
-  const thumbnailSrc = `${API_URL}${item.thumbnailUrl.replace("/api/v1", "")}`;
+  const thumbnailUrl = `${API_URL}${item.thumbnailUrl.replace("/api/v1", "")}`;
   const downloadHref = `${API_URL}${item.downloadUrl.replace("/api/v1", "")}`;
+  const { src: thumbnailSrc, loading: thumbLoading } = useAuthImage(thumbnailUrl);
 
   return (
     <button
@@ -58,7 +61,7 @@ export function HistoryCard({
     >
       {/* Thumbnail area */}
       <div className="relative aspect-square overflow-hidden rounded-t-[10px] bg-surface-container">
-        {imgError ? (
+        {imgError || (!thumbLoading && !thumbnailSrc) ? (
           <div className="flex h-full w-full items-center justify-center text-on-surface-variant/70">
             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
@@ -67,11 +70,12 @@ export function HistoryCard({
               <line x1="3" y1="3" x2="21" y2="21" />
             </svg>
           </div>
+        ) : thumbLoading ? (
+          <div className="h-full w-full animate-pulse bg-surface-container-high" />
         ) : (
           <img
-            src={thumbnailSrc}
+            src={thumbnailSrc!}
             alt={title}
-            loading="lazy"
             className="h-full w-full object-cover"
             onError={() => setImgError(true)}
           />
@@ -166,11 +170,16 @@ export function HistoryCard({
                     role="menu"
                     className="absolute right-0 top-full mt-1 z-50 min-w-[140px] rounded-lg border border-outline-variant/20 bg-surface py-1 shadow-lg"
                   >
-                    <a
-                      href={downloadHref}
-                      download
+                    <button
+                      type="button"
                       role="menuitem"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuOpen(false);
+                        const name = item.displayName || item.originalFilename || `${item.mode}-${item.id.slice(0, 8)}`;
+                        const ext = item.finalFormat || "png";
+                        downloadAuthFile(downloadHref, `${name}.${ext}`);
+                      }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-sm text-on-surface hover:bg-surface-container-high"
                     >
                       <svg
@@ -190,7 +199,7 @@ export function HistoryCard({
                         <line x1="12" y1="15" x2="12" y2="3" />
                       </svg>
                       Download
-                    </a>
+                    </button>
                     {onRename && (
                       <button
                         type="button"

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAppStore } from "@/stores/app-store";
+import { downloadAuthFile } from "@/lib/auth-download";
 import { toast } from "sonner";
 
 const FORMAT_OPTIONS = [
@@ -15,7 +16,7 @@ export function DownloadSection() {
 
   if (step !== "processed" || !uploadId) return null;
 
-  const downloadUrl = `/api/v1/images/${uploadId}/download?format=${selectedFormat}`;
+  const downloadUrl = `${import.meta.env.VITE_API_URL || "/api/v1"}/images/${uploadId}/download?format=${selectedFormat}`;
 
   const handleNewImage = () => {
     // Add to history before resetting
@@ -74,17 +75,20 @@ export function DownloadSection() {
 
       {/* Action Buttons */}
       <div className="flex gap-3">
-        <a
-          href={downloadUrl}
-          download
-          onClick={() => toast.success("Download iniciado!", { description: "A imagem processada está sendo baixada." })}
+        <button
+          type="button"
+          onClick={() => {
+            toast.success("Download iniciado!", { description: "A imagem processada está sendo baixada." });
+            const filename = `processed-${uploadId?.slice(0, 8)}.${selectedFormat === "jpg" ? "jpg" : selectedFormat}`;
+            downloadAuthFile(downloadUrl, filename);
+          }}
           className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-primary to-[#3b82f6] py-3 text-sm font-semibold text-on-primary transition-all hover:shadow-[0_0_20px_rgba(133,173,255,0.3)]"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
           </svg>
           Baixar Imagem Processada
-        </a>
+        </button>
         <button
           onClick={handleNewImage}
           className="rounded-xl border border-outline-variant/30 bg-surface-container/40 px-6 py-3 text-sm font-medium text-on-surface-variant backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-surface-container-high/60 hover:text-on-surface hover:shadow-[0_0_15px_rgba(133,173,255,0.08)]"

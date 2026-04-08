@@ -1,4 +1,17 @@
 import { useAppStore } from "@/stores/app-store";
+import { useAuthImage } from "@/hooks/useAuthImage";
+import { downloadAuthFile } from "@/lib/auth-download";
+
+const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
+
+function AuthThumb({ url }: { url: string }) {
+  const { src } = useAuthImage(url);
+  return src ? (
+    <img src={src} alt="" className="h-10 w-10 rounded-lg object-cover" />
+  ) : (
+    <div className="h-10 w-10 animate-pulse rounded-lg bg-surface-container-high" />
+  );
+}
 
 export function ProcessingHistory() {
   const { history } = useAppStore();
@@ -31,7 +44,7 @@ export function ProcessingHistory() {
               <tr key={`${entry.id}-${i}`} className="border-b border-outline-variant/10 last:border-0 bg-surface-container-low hover:bg-surface-container-high transition-colors">
                 <td className="px-4 py-4">
                   {'thumbnailUrl' in entry && entry.thumbnailUrl ? (
-                    <img src={entry.thumbnailUrl as string} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                    <AuthThumb url={`${API_URL}${(entry.thumbnailUrl as string).replace("/api/v1", "")}`} />
                   ) : (
                     <div className="h-10 w-10 rounded-lg bg-surface-container-high flex items-center justify-center">
                       <svg className="h-5 w-5 text-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -58,13 +71,16 @@ export function ProcessingHistory() {
                   </span>
                 </td>
                 <td className="px-4 py-4 text-right">
-                  <a
-                    href={`/api/v1/images/${entry.id}/download`}
-                    download
+                  <button
+                    type="button"
+                    onClick={() => downloadAuthFile(
+                      `${API_URL}/images/${entry.id}/download`,
+                      entry.filename,
+                    )}
                     className="text-xs text-primary hover:text-primary-dim"
                   >
                     Baixar
-                  </a>
+                  </button>
                 </td>
               </tr>
             ))}

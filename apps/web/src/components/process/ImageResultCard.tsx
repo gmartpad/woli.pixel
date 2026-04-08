@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { formatSize } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useAuthImage } from "@/hooks/useAuthImage";
 import { BeforeAfterLightbox } from "./BeforeAfterLightbox";
 
 const ADJUSTMENT_LABELS: Record<string, { label: string; text: string }> = {
@@ -30,6 +31,8 @@ type Props = {
 
 export function ImageResultCard({ original, processed, adjustments, explanation }: Props) {
   const [lightboxSlide, setLightboxSlide] = useState<0 | 1 | null>(null);
+  // processed.url is always an API endpoint — fetch with Bearer token
+  const { src: processedSrc } = useAuthImage(processed.url);
 
   const sizeChange = Math.round(
     (1 - processed.sizeKb / original.sizeKb) * 100,
@@ -59,21 +62,27 @@ export function ImageResultCard({ original, processed, adjustments, explanation 
           onClick={() => setLightboxSlide(1)}
           className="group relative overflow-hidden rounded-lg border border-outline-variant/20 bg-surface-container/60"
         >
-          <img
-            src={processed.url}
-            alt="Processada"
-            className="h-36 w-full object-contain transition-transform group-hover:scale-105"
-          />
+          {processedSrc ? (
+            <img
+              src={processedSrc}
+              alt="Processada"
+              className="h-36 w-full object-contain transition-transform group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-36 w-full items-center justify-center">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          )}
           <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
             DEPOIS
           </span>
         </button>
       </div>
 
-      {lightboxSlide !== null && (
+      {lightboxSlide !== null && processedSrc && (
         <BeforeAfterLightbox
           originalSrc={original.url}
-          processedSrc={processed.url}
+          processedSrc={processedSrc}
           initialSlide={lightboxSlide}
           onClose={() => setLightboxSlide(null)}
         />
