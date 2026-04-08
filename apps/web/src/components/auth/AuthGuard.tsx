@@ -28,16 +28,6 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return;
     }
 
-    // Handle email verification callback (hash-based)
-    if (window.location.hash === "#verified") {
-      sessionStorage.removeItem("verify-email");
-      toast.success("E-mail verificado com sucesso!", {
-        description: "Sua conta está ativa.",
-      });
-      window.history.replaceState({}, "", window.location.pathname);
-      return;
-    }
-
     // Restore verify-email view after registration (survives re-renders/refreshes)
     const pendingEmail = sessionStorage.getItem("verify-email");
     if (pendingEmail) {
@@ -45,6 +35,18 @@ export function AuthGuard({ children }: AuthGuardProps) {
       setView("verify-email");
     }
   }, []);
+
+  // Show toast when email verification completes (localStorage flag + session watch)
+  useEffect(() => {
+    const pendingEmail = localStorage.getItem("pending-verification");
+    if (session?.user?.emailVerified && pendingEmail && session.user.email === pendingEmail) {
+      localStorage.removeItem("pending-verification");
+      sessionStorage.removeItem("verify-email");
+      toast.success("E-mail verificado com sucesso!", {
+        description: "Sua conta está ativa.",
+      });
+    }
+  }, [session]);
 
   if (isPending) {
     return (
@@ -70,6 +72,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
               onSwitch={() => setView("login")}
               onSuccess={(email: string) => {
                 sessionStorage.setItem("verify-email", email);
+                localStorage.setItem("pending-verification", email);
                 setVerificationEmail(email);
                 setView("verify-email");
               }}
@@ -99,6 +102,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
               <button
                 onClick={() => {
                   sessionStorage.removeItem("verify-email");
+                  localStorage.removeItem("pending-verification");
                   setView("login");
                 }}
                 className="text-sm font-medium text-primary hover:underline"

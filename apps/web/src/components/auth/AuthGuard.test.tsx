@@ -65,6 +65,7 @@ describe("AuthGuard", () => {
     mockToastSuccess.mockReset();
     replaceStateSpy.mockReset();
     sessionStorage.clear();
+    localStorage.clear();
     setLocation({});
   });
 
@@ -153,40 +154,11 @@ describe("AuthGuard", () => {
     expect(screen.queryByText("Verifique seu e-mail")).not.toBeInTheDocument();
   });
 
-  // Bug fix #2: Toast detection via hash fragment instead of query param
-  it("shows success toast when #verified hash is present", () => {
-    setLocation({ hash: "#verified" });
-    mockUseSession.mockReturnValue({ data: null, isPending: false });
-
-    render(<AuthGuard><div>App</div></AuthGuard>);
-
-    expect(mockToastSuccess).toHaveBeenCalledWith(
-      "E-mail verificado com sucesso!",
-      { description: "Sua conta está ativa." }
-    );
-  });
-
-  it("does NOT show toast on normal page load without #verified hash", () => {
-    mockUseSession.mockReturnValue({ data: null, isPending: false });
-
-    render(<AuthGuard><div>App</div></AuthGuard>);
-
-    expect(mockToastSuccess).not.toHaveBeenCalled();
-  });
-
-  it("cleans URL after detecting #verified hash", () => {
-    setLocation({ hash: "#verified" });
-    mockUseSession.mockReturnValue({ data: null, isPending: false });
-
-    render(<AuthGuard><div>App</div></AuthGuard>);
-
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, "", "/");
-  });
-
-  it("shows toast on dashboard when user is authenticated and #verified hash is present", () => {
-    setLocation({ hash: "#verified" });
+  // localStorage-based verification toast tests
+  it("shows toast when session is verified AND pending-verification flag matches email", () => {
+    localStorage.setItem("pending-verification", "user@example.com");
     mockUseSession.mockReturnValue({
-      data: { user: { emailVerified: true } },
+      data: { user: { emailVerified: true, email: "user@example.com" } },
       isPending: false,
     });
 
@@ -196,10 +168,113 @@ describe("AuthGuard", () => {
       "E-mail verificado com sucesso!",
       { description: "Sua conta está ativa." }
     );
-    expect(screen.getByText("App")).toBeInTheDocument();
   });
 
-  // Bug fix #1: sessionStorage persistence for verify-email view
+  it("does NOT show toast when session is verified but no localStorage flag", () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { emailVerified: true, email: "user@example.com" } },
+      isPending: false,
+    });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("does NOT show toast if localStorage email does not match session email", () => {
+    localStorage.setItem("pending-verification", "other@example.com");
+    mockUseSession.mockReturnValue({
+      data: { user: { emailVerified: true, email: "user@example.com" } },
+      isPending: false,
+    });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("clears pending-verification from localStorage after showing toast", () => {
+    localStorage.setItem("pending-verification", "user@example.com");
+    mockUseSession.mockReturnValue({
+      data: { user: { emailVerified: true, email: "user@example.com" } },
+      isPending: false,
+    });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    expect(localStorage.getItem("pending-verification")).toBeNull();
+  });
+
+  it("clears verify-email from sessionStorage when verification completes", () => {
+    localStorage.setItem("pending-verification", "user@example.com");
+    sessionStorage.setItem("verify-email", "user@example.com");
+    mockUseSession.mockReturnValue({
+      data: { user: { emailVerified: true, email: "user@example.com" } },
+      isPending: false,
+    });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    expect(sessionStorage.getItem("verify-email")).toBeNull();
+  });
+
+  it("sets pending-verification in localStorage when registration succeeds", async () => {
+    const user = userEvent.setup();
+    mockUseSession.mockReturnValue({ data: null, isPending: false });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    await user.click(screen.getByText("Criar conta"));
+    await user.click(screen.getByText("Simulate Success"));
+
+    expect(localStorage.getItem("pending-verification")).toBe("test@example.com");
+  });
+
+  it("shows toast when session transitions from pending to verified (rerender)", () => {
+    localStorage.setItem("pending-verification", "user@example.com");
+
+    // Initially: not verified
+    mockUseSession.mockReturnValue({
+      data: { user: { emailVerified: false, email: "user@example.com" } },
+      isPending: false,
+    });
+
+    const { rerender } = render(<AuthGuard><div>App</div></AuthGuard>);
+
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+
+    // Session updates: now verified
+    mockUseSession.mockReturnValue({
+      data: { user: { emailVerified: true, email: "user@example.com" } },
+      isPending: false,
+    });
+
+    rerender(<AuthGuard><div>App</div></AuthGuard>);
+
+    expect(mockToastSuccess).toHaveBeenCalledWith(
+      "E-mail verificado com sucesso!",
+      { description: "Sua conta está ativa." }
+    );
+  });
+
+  it("clears localStorage when 'Voltar ao login' is clicked", async () => {
+    const user = userEvent.setup();
+    sessionStorage.setItem("verify-email", "test@example.com");
+    localStorage.setItem("pending-verification", "test@example.com");
+    mockUseSession.mockReturnValue({ data: null, isPending: false });
+
+    render(<AuthGuard><div>App</div></AuthGuard>);
+
+    expect(screen.getByText("Verifique seu e-mail")).toBeInTheDocument();
+
+    await user.click(screen.getByText("Voltar ao login"));
+
+    expect(localStorage.getItem("pending-verification")).toBeNull();
+    expect(sessionStorage.getItem("verify-email")).toBeNull();
+    expect(screen.getByTestId("login-page")).toBeInTheDocument();
+  });
+
+  // Existing sessionStorage persistence tests
   it("sets sessionStorage when registration succeeds", async () => {
     const user = userEvent.setup();
     mockUseSession.mockReturnValue({ data: null, isPending: false });
@@ -235,16 +310,5 @@ describe("AuthGuard", () => {
 
     expect(sessionStorage.getItem("verify-email")).toBeNull();
     expect(screen.getByTestId("login-page")).toBeInTheDocument();
-  });
-
-  it("clears sessionStorage when #verified hash is detected", () => {
-    sessionStorage.setItem("verify-email", "test@example.com");
-    setLocation({ hash: "#verified" });
-    mockUseSession.mockReturnValue({ data: null, isPending: false });
-
-    render(<AuthGuard><div>App</div></AuthGuard>);
-
-    expect(sessionStorage.getItem("verify-email")).toBeNull();
-    expect(mockToastSuccess).toHaveBeenCalled();
   });
 });
