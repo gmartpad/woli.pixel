@@ -109,4 +109,55 @@ describe("processWizardReducer", () => {
     const result = processWizardReducer(state, { type: "RESET" });
     expect(result.mode).toBe("single");
   });
+
+  // ── Mode reset on SET_FILE ──────────────────────
+
+  it("SET_FILE resets mode to single when in batch mode", () => {
+    const image = { url: "blob://test", filename: "photo.jpg", width: 800, height: 600, sizeKb: 150, format: "jpeg" };
+    const state: ProcessWizardState = { ...initialState, mode: "batch", isUploading: true };
+    const result = processWizardReducer(state, { type: "SET_FILE", uploadId: "u1", image });
+    expect(result.mode).toBe("single");
+    expect(result.uploadId).toBe("u1");
+  });
+
+  // ── Crop state ──────────────────────────────────
+
+  it("initial state has crop set to null", () => {
+    expect(initialState.crop).toBeNull();
+  });
+
+  it("SET_CROP stores crop coordinates", () => {
+    const crop = { x: 10, y: 20, width: 200, height: 150 };
+    const result = processWizardReducer(initialState, { type: "SET_CROP", crop });
+    expect(result.crop).toEqual(crop);
+  });
+
+  it("CLEAR_CROP removes crop", () => {
+    const state: ProcessWizardState = {
+      ...initialState,
+      crop: { x: 10, y: 20, width: 200, height: 150 },
+    };
+    const result = processWizardReducer(state, { type: "CLEAR_CROP" });
+    expect(result.crop).toBeNull();
+  });
+
+  it("SET_TYPE clears existing crop", () => {
+    const state: ProcessWizardState = {
+      ...initialState,
+      selectedTypeId: "old-type",
+      crop: { x: 10, y: 20, width: 200, height: 150 },
+    };
+    const result = processWizardReducer(state, { type: "SET_TYPE", typeId: "new-type" });
+    expect(result.selectedTypeId).toBe("new-type");
+    expect(result.crop).toBeNull();
+  });
+
+  it("RESET clears crop", () => {
+    const state: ProcessWizardState = {
+      ...initialState,
+      crop: { x: 10, y: 20, width: 200, height: 150 },
+    };
+    const result = processWizardReducer(state, { type: "RESET" });
+    expect(result.crop).toBeNull();
+  });
 });

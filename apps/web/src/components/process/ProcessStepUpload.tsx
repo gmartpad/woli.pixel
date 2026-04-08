@@ -98,7 +98,8 @@ export function ProcessStepUpload({ state, dispatch }: Props) {
       return;
     }
 
-    // Single file → upload and advance
+    // Single file → reset any stale batch state and upload
+    useBatchStore.getState().reset();
     const file = stagedFiles[0];
     try {
       dispatch({ type: "SET_UPLOADING", value: true });

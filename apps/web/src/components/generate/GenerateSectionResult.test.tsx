@@ -58,10 +58,11 @@ describe("GenerateSectionResult", () => {
     expect(screen.getByText("50 KB")).toBeInTheDocument();
   });
 
-  it("displays cost information", () => {
-    render(<GenerateSectionResult />);
-    expect(screen.getByText("$0.011")).toBeInTheDocument();
-  });
+  // PRICING_HIDDEN: commented out for demo
+  // it("displays cost information", () => {
+  //   render(<GenerateSectionResult />);
+  //   expect(screen.getByText("$0.011")).toBeInTheDocument();
+  // });
 
   it("displays model badge", () => {
     render(<GenerateSectionResult />);

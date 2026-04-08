@@ -3,6 +3,7 @@ import { useBatchStore } from "@/stores/batch-store";
 import { formatSize } from "@/lib/format";
 import { downloadBatchZip } from "@/lib/api";
 import { downloadAuthFile } from "@/lib/auth-download";
+import { useDownload } from "@/hooks/useDownload";
 import { FormatSelector } from "@/components/FormatSelector";
 import { ImageResultCard } from "./ImageResultCard";
 import type { ProcessWizardAction } from "./process-wizard-reducer";
@@ -37,6 +38,7 @@ function ProcessedImageRow({
 }) {
   const blobUrl = useBlobUrl(img.file);
   const result = img.processedResult!;
+  const { downloading, trigger: triggerDownload } = useDownload();
 
   return (
     <div className="glass-card rounded-xl p-6 space-y-4">
@@ -51,26 +53,21 @@ function ProcessedImageRow({
           />
           <button
             type="button"
-            onClick={() => {
+            disabled={downloading}
+            onClick={() => triggerDownload(async () => {
               const ext = format === "jpeg" ? "jpg" : format;
-              downloadAuthFile(downloadUrl, `${img.file.name.replace(/\.[^.]+$/, "")}.${ext}`);
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+              await downloadAuthFile(downloadUrl, `${img.file.name.replace(/\.[^.]+$/, "")}.${ext}`);
+            })}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors disabled:opacity-60"
           >
-            <svg
-              className="h-3.5 w-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-              />
-            </svg>
-            Download
+            {downloading ? (
+              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+            ) : (
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+            )}
+            {downloading ? "Baixando..." : "Download"}
           </button>
         </div>
       </div>

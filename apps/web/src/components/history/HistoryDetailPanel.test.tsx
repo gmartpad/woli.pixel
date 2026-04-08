@@ -1,8 +1,19 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { HistoryDetailPanel } from "./HistoryDetailPanel";
 import type { HistoryItem } from "@/lib/api";
+
+vi.mock("@/hooks/useAuthImage", () => ({
+  useAuthImage: (url: string | null) => ({
+    src: url ? `blob:test/${url}` : null,
+    loading: false,
+  }),
+}));
+
+vi.mock("@/lib/auth-download", () => ({
+  downloadAuthFile: vi.fn().mockResolvedValue(undefined),
+}));
 
 const genItem: HistoryItem = {
   id: "gen-1",
@@ -67,13 +78,18 @@ function renderPanel(item: HistoryItem, overrides: Partial<Parameters<typeof His
 }
 
 describe("HistoryDetailPanel", () => {
-  it("shows generation metadata (Favicon, Recraft V3, cost $0.040, prompt text)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows generation metadata (Favicon, Recraft V3, prompt text)", () => {
     renderPanel(genItem);
 
     // Favicon appears in header title and in Tipo metadata row
     expect(screen.getAllByText("Favicon")).toHaveLength(2);
     expect(screen.getByText("Recraft V3")).toBeInTheDocument();
-    expect(screen.getByText("$0.040")).toBeInTheDocument();
+    // PRICING_HIDDEN: cost display removed for demo
+    // expect(screen.getByText("$0.040")).toBeInTheDocument();
     expect(screen.getByText("A colorful owl mascot")).toBeInTheDocument();
   });
 
@@ -86,11 +102,12 @@ describe("HistoryDetailPanel", () => {
     expect(screen.getByText(/1200×800\s+480KB\s*→\s*128×128\s+30KB/)).toBeInTheDocument();
   });
 
-  it("hides model/cost/prompt for uploads", () => {
+  it("hides model/prompt for uploads", () => {
     renderPanel(uploadItem);
 
     expect(screen.queryByText("Recraft V3")).not.toBeInTheDocument();
-    expect(screen.queryByText("$0.040")).not.toBeInTheDocument();
+    // PRICING_HIDDEN: cost display removed for demo
+    // expect(screen.queryByText("$0.040")).not.toBeInTheDocument();
     expect(screen.queryByText("Prompt")).not.toBeInTheDocument();
   });
 
@@ -137,12 +154,104 @@ describe("HistoryDetailPanel", () => {
     expect(screen.queryByRole("button", { name: "Re-gerar" })).not.toBeInTheDocument();
   });
 
-  it("compare button shown for upload, hidden for generation", () => {
+  it("compare button NOT shown for upload or generation", () => {
     const { unmount } = renderPanel(uploadItem);
-    expect(screen.getByText("Comparar")).toBeInTheDocument();
+    expect(screen.queryByText("Comparar")).not.toBeInTheDocument();
     unmount();
 
     renderPanel(genItem);
     expect(screen.queryByText("Comparar")).not.toBeInTheDocument();
+  });
+
+  describe("FormatSelector", () => {
+    it("renders format selector with JPEG, PNG, WebP options", () => {
+      renderPanel(genItem);
+
+      expect(screen.getByRole("group", { name: "Formato de download" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "JPEG" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "PNG" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "WebP" })).toBeInTheDocument();
+    });
+
+    it("defaults to the item's finalFormat", () => {
+      // genItem.finalFormat is "png" — the PNG button should have the active style
+      renderPanel(genItem);
+      const pngButton = screen.getByRole("button", { name: "PNG" });
+      expect(pngButton.className).toContain("bg-primary");
+    });
+
+    it("defaults to jpeg for items with jpg format", () => {
+      const jpgItem = { ...uploadItem, finalFormat: "jpg" };
+      renderPanel(jpgItem);
+      const jpegButton = screen.getByRole("button", { name: "JPEG" });
+      expect(jpegButton.className).toContain("bg-primary");
+    });
+
+    it("includes ?format= in the download URL with selected format", async () => {
+      const { downloadAuthFile } = await import("@/lib/auth-download");
+      vi.mocked(downloadAuthFile).mockResolvedValue(undefined);
+
+      const user = userEvent.setup();
+      renderPanel(genItem);
+
+      await user.click(screen.getByRole("button", { name: "Download" }));
+
+      expect(downloadAuthFile).toHaveBeenCalledWith(
+        expect.stringContaining("?format=png"),
+        expect.stringContaining(".png"),
+      );
+    });
+
+    it("uses selected format when changed from default", async () => {
+      const { downloadAuthFile } = await import("@/lib/auth-download");
+      vi.mocked(downloadAuthFile).mockResolvedValue(undefined);
+
+      const user = userEvent.setup();
+      renderPanel(genItem);
+
+      // Switch to WebP
+      await user.click(screen.getByRole("button", { name: "WebP" }));
+      await user.click(screen.getByRole("button", { name: "Download" }));
+
+      expect(downloadAuthFile).toHaveBeenCalledWith(
+        expect.stringContaining("?format=webp"),
+        expect.stringContaining(".webp"),
+      );
+    });
+
+    it("strips existing extension from displayName before appending format", async () => {
+      const { downloadAuthFile } = await import("@/lib/auth-download");
+      vi.mocked(downloadAuthFile).mockResolvedValue(undefined);
+
+      const itemWithExt = { ...genItem, displayName: "generated-851a0d7c.png" };
+      const user = userEvent.setup();
+      renderPanel(itemWithExt);
+
+      // Switch to JPEG and download
+      await user.click(screen.getByRole("button", { name: "JPEG" }));
+      await user.click(screen.getByRole("button", { name: "Download" }));
+
+      expect(downloadAuthFile).toHaveBeenCalledWith(
+        expect.any(String),
+        "generated-851a0d7c.jpg",
+      );
+    });
+
+    it("uses .jpg extension for jpeg format in filename", async () => {
+      const { downloadAuthFile } = await import("@/lib/auth-download");
+      vi.mocked(downloadAuthFile).mockResolvedValue(undefined);
+
+      const user = userEvent.setup();
+      renderPanel(genItem);
+
+      // Switch to JPEG
+      await user.click(screen.getByRole("button", { name: "JPEG" }));
+      await user.click(screen.getByRole("button", { name: "Download" }));
+
+      expect(downloadAuthFile).toHaveBeenCalledWith(
+        expect.stringContaining("?format=jpeg"),
+        expect.stringContaining(".jpg"),
+      );
+    });
   });
 });

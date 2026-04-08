@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAppStore } from "@/stores/app-store";
 import { downloadAuthFile } from "@/lib/auth-download";
+import { useDownload } from "@/hooks/useDownload";
 import { toast } from "sonner";
 
 const FORMAT_OPTIONS = [
@@ -13,6 +14,7 @@ export function DownloadSection() {
   const { step, uploadId, reset, processedResult, originalImage } = useAppStore();
   const defaultFormat = processedResult?.processed?.format === "jpeg" ? "jpg" : processedResult?.processed?.format || "webp";
   const [selectedFormat, setSelectedFormat] = useState(defaultFormat);
+  const { downloading, trigger: triggerDownload } = useDownload();
 
   if (step !== "processed" || !uploadId) return null;
 
@@ -77,17 +79,22 @@ export function DownloadSection() {
       <div className="flex gap-3">
         <button
           type="button"
-          onClick={() => {
+          disabled={downloading}
+          onClick={() => triggerDownload(async () => {
             toast.success("Download iniciado!", { description: "A imagem processada está sendo baixada." });
             const filename = `processed-${uploadId?.slice(0, 8)}.${selectedFormat === "jpg" ? "jpg" : selectedFormat}`;
-            downloadAuthFile(downloadUrl, filename);
-          }}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-primary to-[#3b82f6] py-3 text-sm font-semibold text-on-primary transition-all hover:shadow-[0_0_20px_rgba(133,173,255,0.3)]"
+            await downloadAuthFile(downloadUrl, filename);
+          })}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-primary to-[#3b82f6] py-3 text-sm font-semibold text-on-primary transition-all hover:shadow-[0_0_20px_rgba(133,173,255,0.3)] disabled:opacity-60"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-          </svg>
-          Baixar Imagem Processada
+          {downloading ? (
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+          ) : (
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+          )}
+          {downloading ? "Baixando..." : "Baixar Imagem Processada"}
         </button>
         <button
           onClick={handleNewImage}
