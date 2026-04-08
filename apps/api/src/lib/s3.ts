@@ -9,6 +9,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const s3Client = new S3Client({
   region: process.env.AWS_REGION || "sa-east-1",
+  followRegionRedirects: true,
   requestChecksumCalculation: "WHEN_REQUIRED",
   ...(process.env.AWS_ENDPOINT_URL && {
     endpoint: process.env.AWS_ENDPOINT_URL,

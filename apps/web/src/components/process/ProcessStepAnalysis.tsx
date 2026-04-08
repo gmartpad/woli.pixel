@@ -58,7 +58,7 @@ export function ProcessStepAnalysis({ state, dispatch }: Props) {
             </div>
 
             {/* Metadata */}
-            <div className="space-y-3">
+            <div className="min-w-0 space-y-3">
               <h3 className="text-lg font-bold font-headline text-on-surface truncate">
                 {state.originalImage.filename}
               </h3>

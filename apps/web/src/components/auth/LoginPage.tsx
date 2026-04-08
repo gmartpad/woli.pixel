@@ -53,6 +53,7 @@ export function LoginPage({ onSwitch, onSuccess, onForgot }: LoginPageProps) {
         email: identifier,
         callbackURL: window.location.origin,
       });
+      localStorage.setItem("pending-verification", identifier);
       setResendState("success");
     } catch {
       setError("Erro ao reenviar e-mail");
