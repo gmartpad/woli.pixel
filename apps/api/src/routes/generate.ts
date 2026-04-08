@@ -362,6 +362,33 @@ generateRouter.get("/:id", async (c) => {
   return c.json(job);
 });
 
+// GET /:id/preview — Serve generated image inline for browser preview (no S3 redirect)
+generateRouter.get("/:id/preview", async (c) => {
+  const id = c.req.param("id");
+  const [job] = await db.select().from(generationJobs).where(eq(generationJobs.id, id));
+
+  if (!job || !job.processedS3Key) {
+    return c.json({ error: "Imagem gerada não encontrada" }, 404);
+  }
+
+  const imageBuffer = await getImageBuffer(job.processedS3Key);
+  const format = job.processedFormat || "png";
+
+  const mimeMap: Record<string, string> = {
+    jpeg: "image/jpeg",
+    jpg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+  };
+
+  return new Response(new Uint8Array(imageBuffer), {
+    headers: {
+      "Content-Type": mimeMap[format] || "application/octet-stream",
+      "Cache-Control": "public, max-age=86400",
+    },
+  });
+});
+
 // GET /:id/download — Download generated image (with optional format conversion)
 generateRouter.get("/:id/download", async (c) => {
   const id = c.req.param("id");

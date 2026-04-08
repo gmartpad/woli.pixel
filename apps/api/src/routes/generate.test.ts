@@ -58,6 +58,7 @@ mock.module("../services/ai", () => ({
   analyzeImage: async () => ({}),
   generateExplanation: async () => "",
   analyzeModeration: async () => ({ analysis: "", suggestedPrompt: "" }),
+  translatePromptToEnglish: async (prompt: string) => prompt,
 }));
 
 mock.module("../services/providers/recraft", () => ({
@@ -193,6 +194,55 @@ describe("GET /api/v1/generate/:id/download", () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBeDefined();
+  });
+});
+
+// ── GET /api/v1/generate/:id/preview ─────────────────────────────
+describe("GET /api/v1/generate/:id/preview", () => {
+  test("returns image bytes with correct Content-Type for PNG", async () => {
+    dbSelectResult = [makeFakeJob({ processedFormat: "png" })];
+    mockGetImageBuffer.mockResolvedValueOnce(testPngBuffer);
+
+    const res = await testApp.request(`/api/v1/generate/${fakeJobId}/preview`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/png");
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=86400");
+    expect(res.headers.get("Content-Disposition")).toBeNull();
+
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect(buf.length).toBeGreaterThan(0);
+  });
+
+  test("returns correct Content-Type for JPEG", async () => {
+    dbSelectResult = [makeFakeJob({ processedFormat: "jpeg" })];
+    const jpegBuffer = await sharp({
+      create: { width: 50, height: 50, channels: 3, background: { r: 0, g: 255, b: 0 } },
+    }).jpeg().toBuffer();
+    mockGetImageBuffer.mockResolvedValueOnce(jpegBuffer);
+
+    const res = await testApp.request(`/api/v1/generate/${fakeJobId}/preview`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/jpeg");
+  });
+
+  test("returns 404 for nonexistent job", async () => {
+    dbSelectResult = [];
+
+    const res = await testApp.request(`/api/v1/generate/00000000-0000-0000-0000-000000000000/preview`);
+
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBeDefined();
+  });
+
+  test("returns 404 when processedS3Key is null", async () => {
+    dbSelectResult = [makeFakeJob({ processedS3Key: null })];
+
+    const res = await testApp.request(`/api/v1/generate/${fakeJobId}/preview`);
+
+    expect(res.status).toBe(404);
   });
 });
 

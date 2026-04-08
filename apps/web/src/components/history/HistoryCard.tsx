@@ -50,7 +50,7 @@ export function HistoryCard({
       type="button"
       onClick={selectionMode && onToggle ? () => onToggle(item.id) : onClick}
       className={cn(
-        "group relative flex flex-col rounded-xl border-2 text-left transition-all",
+        "group relative block w-full overflow-hidden rounded-xl border-2 text-left transition-all",
         isSelected || isChecked
           ? "border-primary shadow-xl shadow-primary/5"
           : "border-outline-variant/20 bg-surface-container-low hover:bg-surface-container-high",
