@@ -48,19 +48,16 @@ describe("useAuthImage", () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      "https://api.example.com/image/123/preview",
-      expect.objectContaining({
-        headers: expect.any(Headers),
-        credentials: "include",
-      }),
-    );
-
-    // Verify Bearer token was set in headers
+    // Verify the URL includes inline=1 and Bearer token
     const fetchCall = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
       .calls[0]!;
+    const fetchedUrl = fetchCall[0] as string;
+    expect(fetchedUrl).toContain("https://api.example.com/image/123/preview");
+    expect(fetchedUrl).toContain("inline=1");
+
     const headers = fetchCall[1]!.headers as Headers;
     expect(headers.get("Authorization")).toBe("Bearer test-token-123");
+    expect(fetchCall[1]!.credentials).toBe("include");
   });
 
   it("returns null src on fetch error", async () => {
