@@ -117,7 +117,7 @@ export function HistoryCard({
             item.mode === "generation"
               ? "bg-surface/80 text-primary"
               : item.mode === "crop"
-                ? "bg-secondary/20 text-secondary"
+                ? "bg-surface/80 text-secondary"
                 : "bg-surface/80 text-tertiary",
           )}
         >
