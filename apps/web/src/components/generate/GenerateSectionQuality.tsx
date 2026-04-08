@@ -167,7 +167,7 @@ export function GenerateSectionQuality() {
         note={costData?.note ?? customCostData?.note}
       />
 
-      {/* Cost estimate — shows per-tier cost for the selected tier */}
+      {/* PRICING_HIDDEN: commented out for demo
       {(costData?.costsByTier || customCostData?.costsByTier) && (
         <div className="flex items-center gap-2 text-sm text-on-surface-variant">
           <svg className="h-4 w-4 text-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -183,6 +183,7 @@ export function GenerateSectionQuality() {
           </span>
         </div>
       )}
+      */}
 
       {/* Generate Button */}
       <button

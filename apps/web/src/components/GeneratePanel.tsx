@@ -4,6 +4,7 @@ import { useGenerationStore, type QualityTier, type CustomStyle } from "@/stores
 import { fetchImageTypes, generateImage, generateImageCustom, generateImageFromPreset, getGenerationCostEstimate, getCustomResolutionCostEstimate, ModerationRejectedError } from "@/lib/api";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import { downloadAuthFile, downloadBlobUrl } from "@/lib/auth-download";
+import { useDownload } from "@/hooks/useDownload";
 import { QualitySelector } from "./QualitySelector";
 import { FormatSelector } from "./FormatSelector";
 import { CustomResolutionInput } from "./CustomResolutionInput";
@@ -80,6 +81,7 @@ export function GeneratePanel() {
 
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [downloadFormat, setDownloadFormat] = useState("jpeg");
+  const { downloading, trigger: triggerDownload } = useDownload();
   const moderationRef = useRef<HTMLDivElement>(null);
 
   const previewUrl = result
@@ -119,21 +121,21 @@ export function GeneratePanel() {
     ? FLUX_PRESETS.has(selectedType.typeKey) ? "flux2_pro" : "recraft_v3"
     : null;
 
-  // Cost estimate — presets
-  const { data: costData } = useQuery({
-    queryKey: ["generation-cost-estimate", selectedType?.typeKey],
-    queryFn: () => getGenerationCostEstimate(selectedType!.typeKey),
-    enabled: !!selectedType,
-    staleTime: 5 * 60 * 1000,
-  });
+  // PRICING_HIDDEN: commented out for demo
+  // const { data: costData } = useQuery({
+  //   queryKey: ["generation-cost-estimate", selectedType?.typeKey],
+  //   queryFn: () => getGenerationCostEstimate(selectedType!.typeKey),
+  //   enabled: !!selectedType,
+  //   staleTime: 5 * 60 * 1000,
+  // });
 
-  // Cost estimate — custom resolutions
-  const { data: customCostData } = useQuery({
-    queryKey: ["generation-cost-custom", customWidth, customHeight, customStyle],
-    queryFn: () => getCustomResolutionCostEstimate(customWidth!, customHeight!, customStyle),
-    enabled: generationMode !== "preset" && !!customWidth && !!customHeight,
-    staleTime: 30_000,
-  });
+  // PRICING_HIDDEN: commented out for demo
+  // const { data: customCostData } = useQuery({
+  //   queryKey: ["generation-cost-custom", customWidth, customHeight, customStyle],
+  //   queryFn: () => getCustomResolutionCostEstimate(customWidth!, customHeight!, customStyle),
+  //   enabled: generationMode !== "preset" && !!customWidth && !!customHeight,
+  //   staleTime: 30_000,
+  // });
 
   const hasValidSource = selectedTypeId || (customWidth && customHeight) || customPresetId;
   const canGenerate = hasValidSource && prompt.trim().length >= 10 && step !== "generating" && step !== "processing";
@@ -316,7 +318,7 @@ export function GeneratePanel() {
             </div>
           )}
 
-          {/* Model indicator — for custom modes */}
+          {/* PRICING_HIDDEN: model indicator for custom modes commented out (depends on cost query)
           {!resolvedModel && customCostData?.model && (
             <div className="flex items-center gap-3">
               <span className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
@@ -331,6 +333,7 @@ export function GeneratePanel() {
               </span>
             </div>
           )}
+          */}
 
           {/* Quality selector — for presets use typeKey, for custom pass null */}
           <QualitySelector
@@ -339,7 +342,7 @@ export function GeneratePanel() {
             typeKey={selectedType?.typeKey ?? null}
           />
 
-          {/* Cost estimate — presets */}
+          {/* PRICING_HIDDEN: commented out for demo
           {costData && (
             <div className="flex items-center gap-2 text-sm text-on-surface-variant">
               <svg className="h-4 w-4 text-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -353,8 +356,9 @@ export function GeneratePanel() {
               </span>
             </div>
           )}
+          */}
 
-          {/* Cost estimate — custom */}
+          {/* PRICING_HIDDEN: commented out for demo
           {!costData && customCostData && (
             <div className="flex items-center gap-2 text-sm text-on-surface-variant">
               <svg className="h-4 w-4 text-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -365,6 +369,7 @@ export function GeneratePanel() {
               </span>
             </div>
           )}
+          */}
         </div>
       )}
 
@@ -451,9 +456,11 @@ export function GeneratePanel() {
         <div className="glass-card rounded-xl p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-on-surface font-headline">Imagem Gerada</h3>
+            {/* PRICING_HIDDEN: commented out for demo
             <span className="rounded-md bg-primary/15 px-2 py-1 text-xs font-mono text-primary">
               ${result.cost_usd.toFixed(3)}
             </span>
+            */}
           </div>
 
           {/* Preview */}
@@ -504,7 +511,8 @@ export function GeneratePanel() {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => {
+                disabled={downloading}
+                onClick={() => triggerDownload(async () => {
                   const ext = downloadFormat === "jpeg" ? "jpg" : downloadFormat;
                   const filename = `generated-${result.id.slice(0, 8)}.${ext}`;
                   const nativeFormat = result.image.format.toLowerCase() === "jpg" ? "jpeg" : result.image.format.toLowerCase();
@@ -512,12 +520,17 @@ export function GeneratePanel() {
                     downloadBlobUrl(previewSrc, filename);
                   } else {
                     const url = `${import.meta.env.VITE_API_URL || "/api/v1"}${result.image.download_url.replace("/api/v1", "")}?format=${downloadFormat}`;
-                    downloadAuthFile(url, filename);
+                    await downloadAuthFile(url, filename);
                   }
-                }}
-                className="flex-1 rounded-xl bg-gradient-to-br from-primary to-[#3b82f6] py-2.5 text-center font-bold text-on-primary transition-all hover:shadow-[0_0_20px_rgba(133,173,255,0.3)]"
+                })}
+                className="flex-1 rounded-xl bg-gradient-to-br from-primary to-[#3b82f6] py-2.5 text-center font-bold text-on-primary transition-all hover:shadow-[0_0_20px_rgba(133,173,255,0.3)] disabled:opacity-60"
               >
-                Download
+                {downloading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    Baixando...
+                  </span>
+                ) : "Download"}
               </button>
               <button
                 onClick={reset}

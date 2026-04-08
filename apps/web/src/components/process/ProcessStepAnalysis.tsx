@@ -1,5 +1,8 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { formatSize } from "@/lib/format";
-import { processImage } from "@/lib/api";
+import { fetchImageTypes, processImage } from "@/lib/api";
+import { CropModal } from "@/components/CropModal";
 import { TypeSelector } from "./TypeSelector";
 import type { ProcessWizardState, ProcessWizardAction } from "./process-wizard-reducer";
 
@@ -8,14 +11,32 @@ type Props = {
   dispatch: React.Dispatch<ProcessWizardAction>;
 };
 
+type ImageType = {
+  id: string;
+  width: number | null;
+  height: number | null;
+  displayName: string;
+};
+
 export function ProcessStepAnalysis({ state, dispatch }: Props) {
+  const [showCropModal, setShowCropModal] = useState(false);
+
+  const { data: imageTypesData } = useQuery<{ grouped: Record<string, ImageType[]> }>({
+    queryKey: ["image-types"],
+    queryFn: fetchImageTypes,
+  });
+
+  const selectedType = imageTypesData
+    ? Object.values(imageTypesData.grouped).flat().find((t) => t.id === state.selectedTypeId)
+    : null;
+
   const handleProcess = async () => {
     if (!state.uploadId || !state.selectedTypeId) return;
 
     dispatch({ type: "SET_PROCESSING", value: true });
 
     try {
-      const result = await processImage(state.uploadId, state.selectedTypeId);
+      const result = await processImage(state.uploadId, state.selectedTypeId, state.crop ?? undefined);
       dispatch({ type: "SET_RESULT", result });
       dispatch({ type: "SET_STEP", step: 2 });
     } catch (err) {
@@ -126,6 +147,59 @@ export function ProcessStepAnalysis({ state, dispatch }: Props) {
         selectedTypeId={state.selectedTypeId}
         onSelectType={(typeId) => dispatch({ type: "SET_TYPE", typeId })}
       />
+
+      {/* Crop Section */}
+      {state.selectedTypeId && selectedType && (
+        <div className="glass-card flex items-center justify-between rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <svg className="h-5 w-5 text-on-surface-variant" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 4V2m0 2H2m5 0v14m0 0h10m0 0V6m0 12h5m0-12h-2M7 18H4M17 6V2m0 4h5" />
+            </svg>
+            {state.crop ? (
+              <div className="flex items-center gap-2">
+                <span className="rounded-md bg-primary/15 px-2.5 py-1 text-sm font-medium text-primary">
+                  Recortado ({state.crop.width} x {state.crop.height} px)
+                </span>
+                <button
+                  onClick={() => dispatch({ type: "CLEAR_CROP" })}
+                  className="rounded-md px-2 py-1 text-sm text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                  aria-label="Limpar recorte"
+                >
+                  Limpar
+                </button>
+              </div>
+            ) : (
+              <span className="text-sm text-on-surface-variant">
+                Auto-crop (padrão)
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setShowCropModal(true)}
+            className="rounded-lg border border-primary/30 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+            aria-label="Recortar imagem"
+          >
+            Recortar
+          </button>
+        </div>
+      )}
+
+      {/* CropModal */}
+      {state.originalImage && selectedType && (
+        <CropModal
+          imageSrc={state.originalImage.url}
+          isOpen={showCropModal}
+          onClose={() => setShowCropModal(false)}
+          onConfirm={(crop) => {
+            dispatch({ type: "SET_CROP", crop });
+            setShowCropModal(false);
+          }}
+          onSkip={() => setShowCropModal(false)}
+          targetWidth={selectedType.width}
+          targetHeight={selectedType.height}
+          typeName={selectedType.displayName}
+        />
+      )}
 
       {/* Error State */}
       {state.error && (

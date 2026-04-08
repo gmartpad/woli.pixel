@@ -13,7 +13,8 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { ContextPreview } from "@/components/ContextPreview";
 import { DownloadSection } from "@/components/DownloadSection";
 import { HistoryPage } from "@/components/history/HistoryPage";
-import { CostEstimationPanel } from "@/components/CostEstimationPanel";
+// PRICING_HIDDEN: commented out for demo
+// import { CostEstimationPanel } from "@/components/CostEstimationPanel";
 // Feature 2: Brand
 import { BrandProfileManager } from "@/components/brand/BrandProfileManager";
 import { BrandSelector } from "@/components/brand/BrandSelector";

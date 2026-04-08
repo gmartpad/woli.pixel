@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useGenerationStore } from "@/stores/generation-store";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import { downloadAuthFile, downloadBlobUrl } from "@/lib/auth-download";
+import { useDownload } from "@/hooks/useDownload";
 import { FormatSelector } from "@/components/FormatSelector";
 
 const MODEL_LABELS: Record<string, { name: string; description: string }> = {
@@ -15,6 +16,7 @@ export function GenerateSectionResult() {
   const reset = useGenerationStore((s) => s.reset);
 
   const [downloadFormat, setDownloadFormat] = useState("jpeg");
+  const { downloading, trigger: triggerDownload } = useDownload();
 
   const previewUrl = result
     ? `${import.meta.env.VITE_API_URL || "/api/v1"}/generate/${result.id}/preview`
@@ -40,9 +42,11 @@ export function GenerateSectionResult() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-on-surface font-headline">Imagem Gerada</h3>
+        {/* PRICING_HIDDEN: commented out for demo
         <span className="rounded-md bg-primary/15 px-2 py-1 text-xs font-mono text-primary">
           ${result.cost_usd.toFixed(3)}
         </span>
+        */}
       </div>
 
       {/* Preview */}
@@ -93,22 +97,26 @@ export function GenerateSectionResult() {
         <div className="flex gap-3">
           <button
             type="button"
-            onClick={() => {
+            disabled={downloading}
+            onClick={() => triggerDownload(async () => {
               const ext = downloadFormat === "jpeg" ? "jpg" : downloadFormat;
               const filename = `generated-${result.id.slice(0, 8)}.${ext}`;
               const nativeFormat = result.image.format.toLowerCase() === "jpg" ? "jpeg" : result.image.format.toLowerCase();
               if (downloadFormat === nativeFormat && previewSrc) {
-                // Same format as preview — reuse already-fetched blob, no extra request
                 downloadBlobUrl(previewSrc, filename);
               } else {
-                // Different format — needs server-side conversion
                 const url = `${import.meta.env.VITE_API_URL || "/api/v1"}${result.image.download_url.replace("/api/v1", "")}?format=${downloadFormat}`;
-                downloadAuthFile(url, filename);
+                await downloadAuthFile(url, filename);
               }
-            }}
-            className="flex-1 rounded-xl bg-gradient-to-br from-primary to-[#3b82f6] py-2.5 text-center font-bold text-on-primary transition-all hover:shadow-[0_0_20px_rgba(133,173,255,0.3)]"
+            })}
+            className="flex-1 rounded-xl bg-gradient-to-br from-primary to-[#3b82f6] py-2.5 text-center font-bold text-on-primary transition-all hover:shadow-[0_0_20px_rgba(133,173,255,0.3)] disabled:opacity-60"
           >
-            Download
+            {downloading ? (
+              <span className="inline-flex items-center gap-2">
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                Baixando...
+              </span>
+            ) : "Download"}
           </button>
           <button
             onClick={reset}

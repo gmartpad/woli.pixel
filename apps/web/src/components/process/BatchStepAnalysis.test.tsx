@@ -540,7 +540,7 @@ describe("BatchStepAnalysis", () => {
     useBatchStore.setState({
       batchStep: "reviewed",
       batchId: "batch-1",
-      globalTypeId: null,
+      globalTypeId: "t1",
       globalQualityTier: "medium",
       images: [
         {
@@ -571,7 +571,7 @@ describe("BatchStepAnalysis", () => {
     useBatchStore.setState({
       batchStep: "reviewed",
       batchId: "batch-1",
-      globalTypeId: null,
+      globalTypeId: "t1",
       globalQualityTier: "medium",
       images: [
         {
@@ -602,7 +602,7 @@ describe("BatchStepAnalysis", () => {
     useBatchStore.setState({
       batchStep: "reviewed",
       batchId: "batch-1",
-      globalTypeId: null,
+      globalTypeId: "t1",
       globalQualityTier: "medium",
       images: [
         {
@@ -633,7 +633,7 @@ describe("BatchStepAnalysis", () => {
     useBatchStore.setState({
       batchStep: "reviewed",
       batchId: "batch-1",
-      globalTypeId: null,
+      globalTypeId: "t1",
       globalQualityTier: "medium",
       images: [
         {
@@ -887,7 +887,7 @@ describe("BatchStepAnalysis", () => {
   });
 
   it("still shows per-image analysis info in global mode", () => {
-    setReviewedState();
+    setReviewedState({ globalTypeId: "t1" });
     renderWithProviders(dispatch);
     expect(screen.getByText("8/10")).toBeInTheDocument();
     expect(screen.getByText("Foto")).toBeInTheDocument();
@@ -971,7 +971,7 @@ describe("BatchStepAnalysis", () => {
   });
 
   it("review row thumbnails also show skeleton while loading", () => {
-    setReviewedState();
+    setReviewedState({ globalTypeId: "t1" });
     renderWithProviders(dispatch);
     const skeletons = document.querySelectorAll(".animate-pulse");
     expect(skeletons.length).toBeGreaterThanOrEqual(1);
@@ -1071,6 +1071,7 @@ describe("BatchStepAnalysis", () => {
 
   it("shows Recortado badge when cropCoordinates is set", () => {
     setReviewedState({
+      globalTypeId: "t1",
       images: [{ ...reviewedImage, selectedTypeId: "t1", cropCoordinates: { x: 10, y: 20, width: 100, height: 80 } }],
     });
     renderWithProviders(dispatch);
@@ -1476,4 +1477,108 @@ describe("BatchStepAnalysis", () => {
       expect(mockProcessBatch).toHaveBeenCalledWith("batch-1", "t1", { u2: "t2" }, undefined);
     }, { timeout: 10000 });
   }, 15000);
+
+  // ── Hide Revisão por Imagem in global mode until type selected ──────
+
+  it("hides Revisão por Imagem in global mode when no type selected", () => {
+    useBatchStore.setState({
+      batchStep: "reviewed",
+      batchId: "batch-1",
+      globalTypeId: null,
+      assignmentMode: "global",
+      images: [
+        {
+          file: createTestFile("a.png"),
+          uploadId: "u1",
+          originalWidth: 800,
+          originalHeight: 600,
+          status: "analyzed",
+          analysis: {
+            quality: { score: 8, issues: [], blur_detected: false, low_resolution: false, poor_contrast: false },
+            content: { type: "photo", primary_subject: "Landscape", has_text: false, has_transparency: false, dominant_colors: [] },
+            suggested_type: { image_type_id: "t1", type_key: "fundo_login", display_name: "Fundo Login", confidence: 90, reasoning: "Photo" },
+            crop_suggestion: { subject_center_x: 0.5, subject_center_y: 0.5, recommended_crop: { x1: 0, y1: 0, x2: 1, y2: 1 } },
+          },
+          selectedTypeId: null,
+          qualityScore: 8,
+          qualityTier: null,
+          processedResult: null,
+          autoMatchScore: null,
+          cropCoordinates: null,
+          error: null,
+        },
+      ],
+    });
+
+    renderWithProviders(dispatch);
+    expect(screen.queryByText("Revisão por Imagem")).not.toBeInTheDocument();
+  });
+
+  it("shows Revisão por Imagem in global mode after type is selected", () => {
+    useBatchStore.setState({
+      batchStep: "reviewed",
+      batchId: "batch-1",
+      globalTypeId: "t1",
+      assignmentMode: "global",
+      images: [
+        {
+          file: createTestFile("a.png"),
+          uploadId: "u1",
+          originalWidth: 800,
+          originalHeight: 600,
+          status: "analyzed",
+          analysis: {
+            quality: { score: 8, issues: [], blur_detected: false, low_resolution: false, poor_contrast: false },
+            content: { type: "photo", primary_subject: "Landscape", has_text: false, has_transparency: false, dominant_colors: [] },
+            suggested_type: { image_type_id: "t1", type_key: "fundo_login", display_name: "Fundo Login", confidence: 90, reasoning: "Photo" },
+            crop_suggestion: { subject_center_x: 0.5, subject_center_y: 0.5, recommended_crop: { x1: 0, y1: 0, x2: 1, y2: 1 } },
+          },
+          selectedTypeId: null,
+          qualityScore: 8,
+          qualityTier: null,
+          processedResult: null,
+          autoMatchScore: null,
+          cropCoordinates: null,
+          error: null,
+        },
+      ],
+    });
+
+    renderWithProviders(dispatch);
+    expect(screen.getByText("Revisão por Imagem")).toBeInTheDocument();
+  });
+
+  it("always shows Revisão por Imagem in per-image mode even without global type", () => {
+    useBatchStore.setState({
+      batchStep: "reviewed",
+      batchId: "batch-1",
+      globalTypeId: null,
+      assignmentMode: "per-image",
+      images: [
+        {
+          file: createTestFile("a.png"),
+          uploadId: "u1",
+          originalWidth: 800,
+          originalHeight: 600,
+          status: "analyzed",
+          analysis: {
+            quality: { score: 8, issues: [], blur_detected: false, low_resolution: false, poor_contrast: false },
+            content: { type: "photo", primary_subject: "Landscape", has_text: false, has_transparency: false, dominant_colors: [] },
+            suggested_type: { image_type_id: "t1", type_key: "fundo_login", display_name: "Fundo Login", confidence: 90, reasoning: "Photo" },
+            crop_suggestion: { subject_center_x: 0.5, subject_center_y: 0.5, recommended_crop: { x1: 0, y1: 0, x2: 1, y2: 1 } },
+          },
+          selectedTypeId: null,
+          qualityScore: 8,
+          qualityTier: null,
+          processedResult: null,
+          autoMatchScore: null,
+          cropCoordinates: null,
+          error: null,
+        },
+      ],
+    });
+
+    renderWithProviders(dispatch);
+    expect(screen.getByText("Revisão por Imagem")).toBeInTheDocument();
+  });
 });
