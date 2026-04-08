@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { FormatSelector } from "@/components/FormatSelector";
+import { downloadAuthFile } from "@/lib/auth-download";
 import { ImageResultCard } from "./ImageResultCard";
 import type { ProcessWizardState, ProcessWizardAction } from "./process-wizard-reducer";
 
@@ -16,7 +17,7 @@ export function ProcessStepResult({ state, dispatch }: Props) {
 
   if (!result || !originalImage) return null;
 
-  const downloadUrl = `/api/v1/images/${uploadId}/download${selectedFormat ? `?format=${selectedFormat}` : ""}`;
+  const downloadUrl = `${import.meta.env.VITE_API_URL || "/api/v1"}/images/${uploadId}/download${selectedFormat ? `?format=${selectedFormat}` : ""}`;
   const processed = result.processed as {
     width: number;
     height: number;
@@ -84,9 +85,12 @@ export function ProcessStepResult({ state, dispatch }: Props) {
         >
           Nova Imagem
         </button>
-        <a
-          href={downloadUrl}
-          download
+        <button
+          type="button"
+          onClick={() => {
+            const ext = selectedFormat === "jpeg" || selectedFormat === "jpg" ? "jpg" : selectedFormat;
+            downloadAuthFile(downloadUrl, `processed-${uploadId?.slice(0, 8)}.${ext}`);
+          }}
           className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-primary to-[#3b82f6] py-3 text-lg font-bold text-on-primary transition-all hover:shadow-[0_0_20px_rgba(133,173,255,0.3)]"
         >
           <svg
@@ -103,7 +107,7 @@ export function ProcessStepResult({ state, dispatch }: Props) {
             />
           </svg>
           Download
-        </a>
+        </button>
       </div>
     </div>
   );

@@ -1,8 +1,22 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useGenerationStore } from "@/stores/generation-store";
 import { GenerateSectionResult } from "./GenerateSectionResult";
+
+// Mock useAuthImage to return blob URL synchronously in tests
+vi.mock("@/hooks/useAuthImage", () => ({
+  useAuthImage: (url: string | null) => ({
+    src: url ? `blob:test/${url}` : null,
+    loading: false,
+  }),
+}));
+
+// Mock auth-download to avoid real fetch
+vi.mock("@/lib/auth-download", () => ({
+  downloadAuthFile: vi.fn(),
+  downloadBlobUrl: vi.fn(),
+}));
 
 const MOCK_RESULT = {
   id: "gen-1",
@@ -82,5 +96,48 @@ describe("GenerateSectionResult", () => {
     expect(within(formatGroup).getByText("JPEG")).toBeInTheDocument();
     expect(within(formatGroup).getByText("PNG")).toBeInTheDocument();
     expect(within(formatGroup).getByText("WebP")).toBeInTheDocument();
+  });
+
+  it("reuses preview blob for same-format download instead of fetching again", async () => {
+    const { downloadBlobUrl } = await import("@/lib/auth-download");
+    const { downloadAuthFile } = await import("@/lib/auth-download");
+    const user = userEvent.setup();
+
+    // Mock result is PNG, default downloadFormat syncs to png via useEffect
+    useGenerationStore.setState({
+      step: "completed",
+      result: { ...MOCK_RESULT, image: { ...MOCK_RESULT.image, format: "jpeg" } },
+      prompt: "test",
+    });
+    render(<GenerateSectionResult />);
+
+    await user.click(screen.getByText("Download"));
+
+    expect(downloadBlobUrl).toHaveBeenCalledWith(
+      expect.stringContaining("blob:test/"),
+      expect.stringContaining("generated-"),
+    );
+    expect(downloadAuthFile).not.toHaveBeenCalled();
+  });
+
+  it("fetches from API when download format differs from native format", async () => {
+    const { downloadBlobUrl } = await import("@/lib/auth-download");
+    const { downloadAuthFile } = await import("@/lib/auth-download");
+    vi.mocked(downloadBlobUrl).mockClear();
+    vi.mocked(downloadAuthFile).mockClear();
+
+    const user = userEvent.setup();
+    render(<GenerateSectionResult />);
+
+    // Default format is PNG (from MOCK_RESULT). Switch to WebP.
+    const formatGroup = screen.getByRole("group", { name: /formato de download/i });
+    await user.click(within(formatGroup).getByText("WebP"));
+    await user.click(screen.getByText("Download"));
+
+    expect(downloadAuthFile).toHaveBeenCalledWith(
+      expect.stringContaining("format=webp"),
+      expect.stringContaining(".webp"),
+    );
+    expect(downloadBlobUrl).not.toHaveBeenCalled();
   });
 });

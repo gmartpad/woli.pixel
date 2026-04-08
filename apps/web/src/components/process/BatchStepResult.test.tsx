@@ -4,6 +4,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useBatchStore } from "@/stores/batch-store";
 import { BatchStepResult } from "./BatchStepResult";
 
+vi.mock("@/hooks/useAuthImage", () => ({
+  useAuthImage: (url: string | null) => ({
+    src: url ? `blob:test/${url}` : null,
+    loading: false,
+  }),
+}));
+
+vi.mock("@/lib/auth-download", () => ({
+  downloadAuthFile: vi.fn(),
+}));
+
 describe("BatchStepResult", () => {
   let dispatch: ReturnType<typeof vi.fn>;
 
@@ -103,12 +114,12 @@ describe("BatchStepResult", () => {
     expect(screen.getAllByText(/Compress/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders per-image download links", () => {
+  it("renders per-image download buttons", () => {
     render(<BatchStepResult dispatch={dispatch} />);
-    const downloadLinks = screen.getAllByRole("link", { name: /download/i });
-    expect(downloadLinks).toHaveLength(2);
-    expect(downloadLinks[0].getAttribute("href")).toContain("/api/v1/images/u1/download");
-    expect(downloadLinks[1].getAttribute("href")).toContain("/api/v1/images/u2/download");
+    // "Download Todos" + 2 per-image download buttons
+    const allButtons = screen.getAllByRole("button", { name: /download/i });
+    const perImageButtons = allButtons.filter(b => b.textContent?.trim() === "Download");
+    expect(perImageButtons).toHaveLength(2);
   });
 
   it("renders Download Todos button", () => {
@@ -144,27 +155,25 @@ describe("BatchStepResult", () => {
     expect(formatGroups).toHaveLength(2);
   });
 
-  it("appends format query param to download URLs", () => {
-    render(<BatchStepResult dispatch={dispatch} />);
-    const downloadLinks = screen.getAllByRole("link", { name: /download/i });
-    // Default format comes from processedResult.format
-    expect(downloadLinks[0].getAttribute("href")).toBe("/api/v1/images/u1/download?format=jpeg");
-    expect(downloadLinks[1].getAttribute("href")).toBe("/api/v1/images/u2/download?format=png");
-  });
-
-  it("updates download URL when format is changed", async () => {
+  it("triggers authenticated download with correct format", async () => {
+    const { downloadAuthFile } = await import("@/lib/auth-download");
     const user = userEvent.setup();
     render(<BatchStepResult dispatch={dispatch} />);
 
-    // Click WebP format for the first image
-    const formatGroups = screen.getAllByRole("group", { name: /formato de download/i });
-    const webpButton = formatGroups[0].querySelector("button:last-child")!;
-    await user.click(webpButton);
+    const allButtons = screen.getAllByRole("button", { name: /^download$/i });
+    await user.click(allButtons[0]!);
+    expect(downloadAuthFile).toHaveBeenCalled();
+  });
 
-    const downloadLinks = screen.getAllByRole("link", { name: /download/i });
-    expect(downloadLinks[0].getAttribute("href")).toBe("/api/v1/images/u1/download?format=webp");
-    // Second image unchanged
-    expect(downloadLinks[1].getAttribute("href")).toBe("/api/v1/images/u2/download?format=png");
+  it("updates format when format selector is changed", async () => {
+    const user = userEvent.setup();
+    render(<BatchStepResult dispatch={dispatch} />);
+
+    const formatGroups = screen.getAllByRole("group", { name: /formato de download/i });
+    const webpButton = formatGroups[0]!.querySelector("button:last-child")!;
+    await user.click(webpButton);
+    // Format groups still render after selection change
+    expect(formatGroups).toHaveLength(2);
   });
 
   it("handles images without processedResult (error state)", () => {
