@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import { downloadAuthFile } from "@/lib/auth-download";
+import { useDownload } from "@/hooks/useDownload";
+import { FormatSelector } from "@/components/FormatSelector";
 import type { HistoryItem } from "@/lib/api";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
@@ -61,10 +63,11 @@ function buildMetadata(item: HistoryItem): MetaRow[] {
       label: "Qualidade",
       value: (item.qualityTier && QUALITY_NAMES[item.qualityTier]) || item.qualityTier || "\u2014",
     });
-    rows.push({
-      label: "Custo",
-      value: item.costUsd != null ? `$${item.costUsd.toFixed(3)}` : "\u2014",
-    });
+    // PRICING_HIDDEN: commented out for demo
+    // rows.push({
+    //   label: "Custo",
+    //   value: item.costUsd != null ? `$${item.costUsd.toFixed(3)}` : "\u2014",
+    // });
   }
 
   if (item.mode === "upload") {
@@ -84,10 +87,12 @@ function buildMetadata(item: HistoryItem): MetaRow[] {
 
 export function HistoryDetailPanel({ item, onClose, onOpenLightbox, onDelete, onRegenerate }: Props) {
   const [showEnhanced, setShowEnhanced] = useState(false);
+  const [selectedFormat, setSelectedFormat] = useState(item.finalFormat === "jpg" ? "jpeg" : (item.finalFormat || "png"));
+  const { downloading, trigger: triggerDownload } = useDownload();
 
   const title = item.displayName || item.imageTypeName || item.originalFilename || "Personalizado";
   const thumbnailUrl = `${API_URL}${item.thumbnailUrl.replace("/api/v1", "")}`;
-  const downloadHref = `${API_URL}${item.downloadUrl.replace("/api/v1", "")}`;
+  const downloadHref = `${API_URL}${item.downloadUrl.replace("/api/v1", "")}?format=${selectedFormat}`;
   const { src: thumbnailSrc } = useAuthImage(thumbnailUrl);
   const metadata = buildMetadata(item);
 
@@ -181,28 +186,27 @@ export function HistoryDetailPanel({ item, onClose, onOpenLightbox, onDelete, on
       <div className="flex-1" />
 
       {/* Action Bar */}
-      <div className="flex flex-wrap items-center gap-2 border-t border-outline-variant/30 p-4">
+      <div className="flex flex-col gap-3 border-t border-outline-variant/30 p-4">
+        <FormatSelector selected={selectedFormat} onChange={setSelectedFormat} />
+        <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => {
-            const name = item.displayName || item.originalFilename || `${item.mode}-${item.id.slice(0, 8)}`;
-            const ext = item.finalFormat || "png";
-            downloadAuthFile(downloadHref, `${name}.${ext}`);
-          }}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:bg-primary-dim"
+          disabled={downloading}
+          onClick={() => triggerDownload(async () => {
+            const raw = item.displayName || item.originalFilename || `${item.mode}-${item.id.slice(0, 8)}`;
+            const name = raw.replace(/\.[^.]+$/, "");
+            const ext = selectedFormat === "jpeg" ? "jpg" : selectedFormat;
+            await downloadAuthFile(downloadHref, `${name}.${ext}`);
+          })}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:bg-primary-dim disabled:opacity-60"
         >
-          Download
+          {downloading ? (
+            <span className="inline-flex items-center gap-1.5">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              Baixando...
+            </span>
+          ) : "Download"}
         </button>
-
-        {item.mode === "upload" && (
-          <button
-            type="button"
-            onClick={() => onOpenLightbox("compare")}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-surface-container-high px-3 py-2 text-sm font-medium text-on-surface hover:bg-surface-bright"
-          >
-            Comparar
-          </button>
-        )}
 
         {item.mode === "generation" && (
           <button
@@ -223,6 +227,7 @@ export function HistoryDetailPanel({ item, onClose, onOpenLightbox, onDelete, on
         >
           Excluir
         </button>
+        </div>
       </div>
     </aside>
   );

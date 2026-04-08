@@ -50,6 +50,7 @@ export function QualitySelector({ selectedTier, onSelect, costs, modelLabel, not
             >
               <span className="font-semibold">{label}</span>
               <span className="text-[11px] text-outline">{description}</span>
+              {/* PRICING_HIDDEN: commented out for demo
               {cost != null && (
                 <span className={`mt-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-mono ${
                   isSelected
@@ -59,6 +60,7 @@ export function QualitySelector({ selectedTier, onSelect, costs, modelLabel, not
                   ${cost.toFixed(3)}
                 </span>
               )}
+              */}
             </button>
           );
         })}

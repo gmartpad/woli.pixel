@@ -15,6 +15,14 @@ vi.mock("@/lib/api", () => ({
   processImage: (...args: unknown[]) => mockProcessImage(...args),
 }));
 
+let mockCropModalOnConfirm: ((crop: { x: number; y: number; width: number; height: number }) => void) | null = null;
+vi.mock("@/components/CropModal", () => ({
+  CropModal: (props: { isOpen: boolean; onConfirm: typeof mockCropModalOnConfirm; onClose: () => void; onSkip: () => void }) => {
+    mockCropModalOnConfirm = props.onConfirm;
+    return props.isOpen ? <div data-testid="crop-modal">CropModal</div> : null;
+  },
+}));
+
 function createTestQueryClient() {
   return new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -39,6 +47,7 @@ const baseState: ProcessWizardState = {
     suggestedTypeId: "type-1",
     suggestedTypeName: "Fundo Login",
   },
+  crop: null,
 };
 
 function renderWithQuery(state: ProcessWizardState, dispatch: ReturnType<typeof vi.fn>) {
@@ -170,7 +179,7 @@ describe("ProcessStepAnalysis", () => {
     expect(dispatch).toHaveBeenCalledWith({ type: "SET_PROCESSING", value: true });
 
     await waitFor(() => {
-      expect(mockProcessImage).toHaveBeenCalledWith("upload-1", "type-1");
+      expect(mockProcessImage).toHaveBeenCalledWith("upload-1", "type-1", undefined);
     });
 
     await waitFor(() => {
@@ -209,5 +218,85 @@ describe("ProcessStepAnalysis", () => {
     renderWithQuery(state, dispatch);
     expect(screen.getByText("Processing failed")).toBeInTheDocument();
     expect(screen.getByText("Tentar novamente")).toBeInTheDocument();
+  });
+
+  // ── Manual Crop UI ──────────────────────────────
+
+  it("does not show crop button when no type is selected", () => {
+    const state = { ...baseState, selectedTypeId: null };
+    renderWithQuery(state, dispatch);
+    expect(screen.queryByRole("button", { name: /recortar/i })).not.toBeInTheDocument();
+  });
+
+  it("shows crop button when a type is selected", async () => {
+    const state = { ...baseState, selectedTypeId: "type-1" };
+    renderWithQuery(state, dispatch);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /recortar/i })).toBeInTheDocument();
+    });
+  });
+
+  it("shows auto-crop label by default", async () => {
+    const state = { ...baseState, selectedTypeId: "type-1" };
+    renderWithQuery(state, dispatch);
+    await waitFor(() => {
+      expect(screen.getByText(/auto-crop/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows 'Recortado' badge when crop is set", async () => {
+    const state: ProcessWizardState = {
+      ...baseState,
+      selectedTypeId: "type-1",
+      crop: { x: 10, y: 20, width: 200, height: 150 },
+    };
+    renderWithQuery(state, dispatch);
+    await waitFor(() => {
+      expect(screen.getByText(/recortado/i)).toBeInTheDocument();
+    });
+  });
+
+  it("Limpar button dispatches CLEAR_CROP", async () => {
+    const user = userEvent.setup();
+    const state: ProcessWizardState = {
+      ...baseState,
+      selectedTypeId: "type-1",
+      crop: { x: 10, y: 20, width: 200, height: 150 },
+    };
+    renderWithQuery(state, dispatch);
+    const clearBtn = await screen.findByRole("button", { name: /limpar/i });
+    await user.click(clearBtn);
+    expect(dispatch).toHaveBeenCalledWith({ type: "CLEAR_CROP" });
+  });
+
+  it("processImage called WITH crop when crop is set", async () => {
+    const user = userEvent.setup();
+    const crop = { x: 10, y: 20, width: 200, height: 150 };
+    mockProcessImage.mockResolvedValue({ processed: {} });
+    const state: ProcessWizardState = {
+      ...baseState,
+      selectedTypeId: "type-1",
+      crop,
+    };
+    renderWithQuery(state, dispatch);
+    await user.click(screen.getByRole("button", { name: /processar imagem/i }));
+    await waitFor(() => {
+      expect(mockProcessImage).toHaveBeenCalledWith("upload-1", "type-1", crop);
+    });
+  });
+
+  it("processImage called WITHOUT crop when no crop is set", async () => {
+    const user = userEvent.setup();
+    mockProcessImage.mockResolvedValue({ processed: {} });
+    const state: ProcessWizardState = {
+      ...baseState,
+      selectedTypeId: "type-1",
+      crop: null,
+    };
+    renderWithQuery(state, dispatch);
+    await user.click(screen.getByRole("button", { name: /processar imagem/i }));
+    await waitFor(() => {
+      expect(mockProcessImage).toHaveBeenCalledWith("upload-1", "type-1", undefined);
+    });
   });
 });

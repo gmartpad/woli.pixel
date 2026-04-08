@@ -2,6 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuthImage } from "@/hooks/useAuthImage";
 import { downloadAuthFile } from "@/lib/auth-download";
+import { useDownload } from "@/hooks/useDownload";
 import type { HistoryItem } from "@/lib/api";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
@@ -30,6 +31,7 @@ export function HistoryCard({
 }: Props) {
   const [imgError, setImgError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { downloading, trigger: triggerDownload } = useDownload();
 
   const title =
     item.displayName || item.imageTypeName || item.originalFilename || "Personalizado";
@@ -173,14 +175,15 @@ export function HistoryCard({
                     <button
                       type="button"
                       role="menuitem"
+                      disabled={downloading}
                       onClick={(e) => {
                         e.stopPropagation();
                         setMenuOpen(false);
                         const name = item.displayName || item.originalFilename || `${item.mode}-${item.id.slice(0, 8)}`;
                         const ext = item.finalFormat || "png";
-                        downloadAuthFile(downloadHref, `${name}.${ext}`);
+                        triggerDownload(() => downloadAuthFile(downloadHref, `${name}.${ext}`));
                       }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-on-surface hover:bg-surface-container-high"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-on-surface hover:bg-surface-container-high disabled:opacity-60"
                     >
                       <svg
                         aria-hidden="true"

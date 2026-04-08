@@ -19,6 +19,7 @@ export type ProcessWizardState = {
     suggestedTypeName: string | null;
   } | null;
   selectedTypeId: string | null;
+  crop: { x: number; y: number; width: number; height: number } | null;
   qualityTier: "low" | "medium" | "high";
   result: Record<string, unknown> | null;
   error: string | null;
@@ -32,6 +33,8 @@ export type ProcessWizardAction =
   | { type: "SET_UPLOADING"; value: boolean }
   | { type: "SET_ANALYSIS"; analysis: ProcessWizardState["analysis"] }
   | { type: "SET_TYPE"; typeId: string }
+  | { type: "SET_CROP"; crop: { x: number; y: number; width: number; height: number } }
+  | { type: "CLEAR_CROP" }
   | { type: "SET_QUALITY"; tier: "low" | "medium" | "high" }
   | { type: "SET_PROCESSING"; value: boolean }
   | { type: "SET_RESULT"; result: Record<string, unknown> }
@@ -46,6 +49,7 @@ export const initialState: ProcessWizardState = {
   originalImage: null,
   analysis: null,
   selectedTypeId: null,
+  crop: null,
   qualityTier: "medium",
   result: null,
   error: null,
@@ -61,13 +65,17 @@ export function processWizardReducer(
     case "SET_STEP":
       return { ...state, step: action.step, error: null };
     case "SET_FILE":
-      return { ...state, uploadId: action.uploadId, originalImage: action.image, isUploading: false };
+      return { ...state, uploadId: action.uploadId, originalImage: action.image, isUploading: false, mode: "single" };
     case "SET_UPLOADING":
       return { ...state, isUploading: action.value };
     case "SET_ANALYSIS":
       return { ...state, analysis: action.analysis };
     case "SET_TYPE":
-      return { ...state, selectedTypeId: action.typeId };
+      return { ...state, selectedTypeId: action.typeId, crop: null };
+    case "SET_CROP":
+      return { ...state, crop: action.crop };
+    case "CLEAR_CROP":
+      return { ...state, crop: null };
     case "SET_QUALITY":
       return { ...state, qualityTier: action.tier };
     case "SET_PROCESSING":

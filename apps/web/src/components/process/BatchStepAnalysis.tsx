@@ -380,7 +380,8 @@ export function BatchStepAnalysis({ dispatch }: Props) {
             />
           )}
 
-          {/* Per-image review list */}
+          {/* Per-image review list — hidden in global mode until a type is chosen */}
+          {(assignmentMode !== "global" || globalTypeId !== null) && (
           <div className="glass-card rounded-xl p-6 space-y-4">
             <h3 className="text-lg font-semibold text-on-surface font-headline">
               Revisão por Imagem
@@ -505,6 +506,7 @@ export function BatchStepAnalysis({ dispatch }: Props) {
               ))}
             </div>
           </div>
+          )}
 
           {/* Process button — sticky */}
           <div className="sticky bottom-0 z-10 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-2">
