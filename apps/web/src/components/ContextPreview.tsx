@@ -1,6 +1,7 @@
 import { useAppStore } from "@/stores/app-store";
 import { useQuery } from "@tanstack/react-query";
 import { fetchImageTypes } from "@/lib/api";
+import { useAuthImage } from "@/hooks/useAuthImage";
 
 type MockupType = "desktop" | "mobile" | "email" | "browser" | "workspace_card" | "workspace_details" | "gamification_badge" | "gamification_ranking" | "gamification_store" | "gamification_campaign" | "gamification_avatar";
 
@@ -633,9 +634,13 @@ export function ContextPreview() {
     queryFn: fetchImageTypes,
   });
 
-  if (step !== "processed" || !processedResult || !uploadId) return null;
+  const apiUrl = step === "processed" && uploadId
+    ? `${import.meta.env.VITE_API_URL || "/api/v1"}/images/${uploadId}/download`
+    : null;
+  const { src: downloadUrl } = useAuthImage(apiUrl);
 
-  const downloadUrl = `/api/v1/images/${uploadId}/download`;
+  if (step !== "processed" || !processedResult || !uploadId) return null;
+  if (!downloadUrl) return null;
 
   // Determine default mockup from the selected type's preview_context
   const selectedType = typesData?.types?.find((t: any) => t.id === selectedTypeId);

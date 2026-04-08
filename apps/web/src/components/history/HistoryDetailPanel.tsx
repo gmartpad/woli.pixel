@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { useAuthImage } from "@/hooks/useAuthImage";
+import { downloadAuthFile } from "@/lib/auth-download";
 import type { HistoryItem } from "@/lib/api";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
@@ -85,8 +86,9 @@ export function HistoryDetailPanel({ item, onClose, onOpenLightbox, onDelete, on
   const [showEnhanced, setShowEnhanced] = useState(false);
 
   const title = item.displayName || item.imageTypeName || item.originalFilename || "Personalizado";
-  const thumbnailSrc = `${API_URL}${item.thumbnailUrl.replace("/api/v1", "")}`;
+  const thumbnailUrl = `${API_URL}${item.thumbnailUrl.replace("/api/v1", "")}`;
   const downloadHref = `${API_URL}${item.downloadUrl.replace("/api/v1", "")}`;
+  const { src: thumbnailSrc } = useAuthImage(thumbnailUrl);
   const metadata = buildMetadata(item);
 
   const hasEnhancedPrompt =
@@ -117,11 +119,17 @@ export function HistoryDetailPanel({ item, onClose, onOpenLightbox, onDelete, on
           aria-label="Ampliar imagem"
           className="w-full cursor-zoom-in overflow-hidden rounded-lg bg-surface-container"
         >
-          <img
-            src={thumbnailSrc}
-            alt={title}
-            className="h-auto w-full object-contain"
-          />
+          {thumbnailSrc ? (
+            <img
+              src={thumbnailSrc}
+              alt={title}
+              className="h-auto w-full object-contain"
+            />
+          ) : (
+            <div className="flex h-48 w-full items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          )}
         </button>
       </div>
 
@@ -174,13 +182,17 @@ export function HistoryDetailPanel({ item, onClose, onOpenLightbox, onDelete, on
 
       {/* Action Bar */}
       <div className="flex flex-wrap items-center gap-2 border-t border-outline-variant/30 p-4">
-        <a
-          href={downloadHref}
-          download
+        <button
+          type="button"
+          onClick={() => {
+            const name = item.displayName || item.originalFilename || `${item.mode}-${item.id.slice(0, 8)}`;
+            const ext = item.finalFormat || "png";
+            downloadAuthFile(downloadHref, `${name}.${ext}`);
+          }}
           className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:bg-primary-dim"
         >
           Download
-        </a>
+        </button>
 
         {item.mode === "upload" && (
           <button

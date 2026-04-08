@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useBatchStore } from "@/stores/batch-store";
 import { formatSize } from "@/lib/format";
 import { downloadBatchZip } from "@/lib/api";
+import { downloadAuthFile } from "@/lib/auth-download";
 import { FormatSelector } from "@/components/FormatSelector";
 import { ImageResultCard } from "./ImageResultCard";
 import type { ProcessWizardAction } from "./process-wizard-reducer";
@@ -48,9 +49,12 @@ function ProcessedImageRow({
             selected={format}
             onChange={onFormatChange}
           />
-          <a
-            href={downloadUrl}
-            download
+          <button
+            type="button"
+            onClick={() => {
+              const ext = format === "jpeg" ? "jpg" : format;
+              downloadAuthFile(downloadUrl, `${img.file.name.replace(/\.[^.]+$/, "")}.${ext}`);
+            }}
             className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
           >
             <svg
@@ -67,7 +71,7 @@ function ProcessedImageRow({
               />
             </svg>
             Download
-          </a>
+          </button>
         </div>
       </div>
       <ImageResultCard

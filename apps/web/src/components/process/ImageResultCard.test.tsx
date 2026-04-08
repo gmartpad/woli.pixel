@@ -1,7 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ImageResultCard } from "./ImageResultCard";
+
+vi.mock("@/hooks/useAuthImage", () => ({
+  useAuthImage: (url: string | null) => ({
+    src: url ? `blob:test/${url}` : null,
+    loading: false,
+  }),
+}));
 
 const defaultProps = {
   original: {

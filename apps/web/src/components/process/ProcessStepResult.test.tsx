@@ -2,6 +2,17 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ProcessStepResult } from "./ProcessStepResult";
+
+vi.mock("@/hooks/useAuthImage", () => ({
+  useAuthImage: (url: string | null) => ({
+    src: url ? `blob:test/${url}` : null,
+    loading: false,
+  }),
+}));
+
+vi.mock("@/lib/auth-download", () => ({
+  downloadAuthFile: vi.fn(),
+}));
 import {
   initialState,
   type ProcessWizardState,
@@ -71,10 +82,13 @@ describe("ProcessStepResult", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders a download link", () => {
+  it("renders a download button", async () => {
+    const { downloadAuthFile } = await import("@/lib/auth-download");
+    const user = userEvent.setup();
     render(<ProcessStepResult state={baseState} dispatch={dispatch} />);
-    const downloadLink = screen.getByRole("link", { name: /download/i });
-    expect(downloadLink.getAttribute("href")).toContain("/api/v1/images/upload-1/download");
+    const downloadBtn = screen.getByRole("button", { name: /download/i });
+    await user.click(downloadBtn);
+    expect(downloadAuthFile).toHaveBeenCalled();
   });
 
   it("renders Nova Imagem button that dispatches RESET", async () => {

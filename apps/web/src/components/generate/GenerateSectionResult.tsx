@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useGenerationStore } from "@/stores/generation-store";
+import { useAuthImage } from "@/hooks/useAuthImage";
+import { downloadAuthFile, downloadBlobUrl } from "@/lib/auth-download";
 import { FormatSelector } from "@/components/FormatSelector";
 
 const MODEL_LABELS: Record<string, { name: string; description: string }> = {
@@ -13,6 +15,11 @@ export function GenerateSectionResult() {
   const reset = useGenerationStore((s) => s.reset);
 
   const [downloadFormat, setDownloadFormat] = useState("jpeg");
+
+  const previewUrl = result
+    ? `${import.meta.env.VITE_API_URL || "/api/v1"}/generate/${result.id}/preview`
+    : null;
+  const { src: previewSrc, loading: previewLoading } = useAuthImage(previewUrl);
 
   useEffect(() => {
     if (result?.image?.format) {
@@ -40,11 +47,21 @@ export function GenerateSectionResult() {
 
       {/* Preview */}
       <div className="flex justify-center rounded-lg bg-surface-container-low p-4">
-        <img
-          src={`${import.meta.env.VITE_API_URL || "/api/v1"}/generate/${result.id}/preview`}
-          alt="Generated"
-          className="max-h-96 rounded-lg object-contain"
-        />
+        {previewLoading ? (
+          <div className="flex h-48 items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        ) : previewSrc ? (
+          <img
+            src={previewSrc}
+            alt="Generated"
+            className="max-h-96 rounded-lg object-contain"
+          />
+        ) : (
+          <div className="flex h-48 items-center justify-center text-on-surface-variant">
+            <p className="text-sm">Erro ao carregar preview</p>
+          </div>
+        )}
       </div>
 
       {/* Meta */}
@@ -74,13 +91,25 @@ export function GenerateSectionResult() {
           <FormatSelector selected={downloadFormat} onChange={setDownloadFormat} />
         </div>
         <div className="flex gap-3">
-          <a
-            href={`${import.meta.env.VITE_API_URL || "/api/v1"}${result.image.download_url.replace("/api/v1", "")}?format=${downloadFormat}`}
-            download
+          <button
+            type="button"
+            onClick={() => {
+              const ext = downloadFormat === "jpeg" ? "jpg" : downloadFormat;
+              const filename = `generated-${result.id.slice(0, 8)}.${ext}`;
+              const nativeFormat = result.image.format.toLowerCase() === "jpg" ? "jpeg" : result.image.format.toLowerCase();
+              if (downloadFormat === nativeFormat && previewSrc) {
+                // Same format as preview — reuse already-fetched blob, no extra request
+                downloadBlobUrl(previewSrc, filename);
+              } else {
+                // Different format — needs server-side conversion
+                const url = `${import.meta.env.VITE_API_URL || "/api/v1"}${result.image.download_url.replace("/api/v1", "")}?format=${downloadFormat}`;
+                downloadAuthFile(url, filename);
+              }
+            }}
             className="flex-1 rounded-xl bg-gradient-to-br from-primary to-[#3b82f6] py-2.5 text-center font-bold text-on-primary transition-all hover:shadow-[0_0_20px_rgba(133,173,255,0.3)]"
           >
             Download
-          </a>
+          </button>
           <button
             onClick={reset}
             className="rounded-xl border border-outline-variant/20 px-6 py-2.5 text-sm font-medium text-on-surface-variant hover:bg-surface-container-high"

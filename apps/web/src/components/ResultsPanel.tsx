@@ -1,4 +1,5 @@
 import { useAppStore } from "@/stores/app-store";
+import { useAuthImage } from "@/hooks/useAuthImage";
 
 function formatSize(kb: number) {
   if (kb >= 1024) return `${(kb / 1024).toFixed(1)} MB`;
@@ -18,7 +19,8 @@ export function ResultsPanel() {
 
   if (step !== "processed" || !processedResult || !originalImage) return null;
 
-  const downloadUrl = `/api/v1/images/${uploadId}/download`;
+  const downloadUrl = `${import.meta.env.VITE_API_URL || "/api/v1"}/images/${uploadId}/download`;
+  const { src: processedSrc } = useAuthImage(downloadUrl);
   const reduction = Math.round((1 - processedResult.processed.size_kb / originalImage.sizeKb) * 100);
 
   return (
@@ -53,7 +55,13 @@ export function ResultsPanel() {
             DEPOIS
           </span>
           <div className="overflow-hidden rounded-lg border border-primary/30 bg-surface-container/60 shadow-[0_0_15px_rgba(133,173,255,0.08)]">
-            <img src={downloadUrl} alt="Processada" className="h-48 w-full object-contain" />
+            {processedSrc ? (
+              <img src={processedSrc} alt="Processada" className="h-48 w-full object-contain" />
+            ) : (
+              <div className="flex h-48 w-full items-center justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            )}
           </div>
         </div>
       </div>
