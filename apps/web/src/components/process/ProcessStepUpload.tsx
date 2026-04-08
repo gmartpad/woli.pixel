@@ -13,7 +13,7 @@ function StagedFileCard({ file, index, onRemove }: {
   const [objectUrl] = useState(() => URL.createObjectURL(file));
 
   return (
-    <div className="relative group rounded-lg border border-outline-variant/10 bg-surface-container-high p-1.5">
+    <div className="relative group min-w-0 rounded-lg border border-outline-variant/10 bg-surface-container-high p-1.5">
       {!loaded && (
         <div
           data-testid={`skeleton-${index}`}
