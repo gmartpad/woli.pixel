@@ -409,8 +409,25 @@ generateRouter.get("/:id/download", async (c) => {
   // Normalize "jpg" → "jpeg" for comparison
   const normalizedRequested = requestedFormat === "jpg" ? "jpeg" : requestedFormat;
 
-  // No format conversion: redirect to presigned S3 URL
+  // No format conversion needed
   if (!normalizedRequested || normalizedRequested === storedFormat) {
+    // If the request comes from fetch() (useAuthImage), stream inline to avoid
+    // S3 CORS issues. Direct browser navigation still gets the fast S3 redirect.
+    const wantsInline = c.req.query("inline") === "1";
+    if (wantsInline) {
+      const imageBuffer = await getImageBuffer(job.processedS3Key);
+      const mimeKey = storedFormat === "jpg" ? "jpeg" : storedFormat;
+      const mimeMap: Record<string, string> = {
+        jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
+      };
+      return new Response(new Uint8Array(imageBuffer), {
+        headers: {
+          "Content-Type": mimeMap[mimeKey] || "application/octet-stream",
+          "Cache-Control": "public, max-age=86400",
+        },
+      });
+    }
+
     const ext = storedFormat === "jpeg" ? "jpg" : storedFormat;
     const downloadName = `generated-${job.id.slice(0, 8)}.${ext}`;
     const url = await getDownloadUrl(job.processedS3Key, downloadName);

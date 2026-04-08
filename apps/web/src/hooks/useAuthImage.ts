@@ -39,7 +39,12 @@ export function useAuthImage(url: string | null): {
       headers.set("Authorization", `Bearer ${token}`);
     }
 
-    fetch(url, { headers, credentials: "include" })
+    // Append inline=1 so download endpoints stream instead of redirecting
+    // to S3 (which would fail CORS preflight from fetch())
+    const fetchUrl = new URL(url, window.location.origin);
+    fetchUrl.searchParams.set("inline", "1");
+
+    fetch(fetchUrl.toString(), { headers, credentials: "include" })
       .then((res) => {
         if (!res.ok) throw new Error(`${res.status}`);
         return res.blob();

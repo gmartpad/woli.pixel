@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-
-const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
+import { useAuthImage } from "@/hooks/useAuthImage";
 
 type Props = {
   imageUrl: string;
@@ -29,10 +28,9 @@ export function HistoryLightbox({
   const containerRef = useRef<HTMLDivElement>(null);
   const [sliderPosition, setSliderPosition] = useState(50);
 
-  const imageSrc = `${API_URL}${imageUrl.replace("/api/v1", "")}`;
-  const originalSrc = originalImageUrl
-    ? `${API_URL}${originalImageUrl.replace("/api/v1", "")}`
-    : null;
+  // URLs are already fully constructed by the parent — just authenticate them
+  const { src: imageSrc } = useAuthImage(imageUrl);
+  const { src: originalSrc } = useAuthImage(originalImageUrl ?? null);
 
   const showComparison = mode === "compare" && originalSrc;
 
@@ -169,12 +167,16 @@ export function HistoryLightbox({
               Processado
             </span>
           </div>
-        ) : (
+        ) : imageSrc ? (
           <img
             src={imageSrc}
             alt={alt}
             className="max-h-[80vh] max-w-[90vw] object-contain"
           />
+        ) : (
+          <div className="flex items-center justify-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          </div>
         )}
       </div>
     </div>

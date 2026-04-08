@@ -3,6 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { HistoryLightbox } from "./HistoryLightbox";
 
+vi.mock("@/hooks/useAuthImage", () => ({
+  useAuthImage: (url: string | null) => ({
+    src: url ? `blob:test/${url}` : null,
+    loading: false,
+  }),
+}));
+
 const defaultProps = {
   imageUrl: "/api/v1/generate/gen-1/download",
   alt: "Test image",

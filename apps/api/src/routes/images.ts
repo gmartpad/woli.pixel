@@ -287,8 +287,25 @@ imagesRouter.get("/:id/download", async (c) => {
   // Normalize "jpg" → "jpeg" for comparison
   const normalizedRequested = requestedFormat === "jpg" ? "jpeg" : requestedFormat;
 
-  // No format conversion: redirect to presigned S3 URL
+  // No format conversion needed
   if (!normalizedRequested || normalizedRequested === storedFormat) {
+    // If the request comes from fetch() (useAuthImage), stream inline to avoid
+    // S3 CORS issues. Direct browser navigation still gets the fast S3 redirect.
+    const wantsInline = c.req.query("inline") === "1";
+    if (wantsInline) {
+      const imageBuffer = await getImageBuffer(upload.processedS3Key);
+      const mimeKey = storedFormat === "jpg" ? "jpeg" : storedFormat;
+      const mimeMap: Record<string, string> = {
+        jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif",
+      };
+      return new Response(new Uint8Array(imageBuffer), {
+        headers: {
+          "Content-Type": mimeMap[mimeKey] || "application/octet-stream",
+          "Cache-Control": "public, max-age=86400",
+        },
+      });
+    }
+
     const ext = storedFormat === "jpeg" ? "jpg" : storedFormat;
     const downloadName = upload.originalFilename.replace(/\.[^.]+$/, `_processed.${ext}`);
     const url = await getDownloadUrl(upload.processedS3Key, downloadName);
